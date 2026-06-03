@@ -138,4 +138,6 @@ process.on('SIGTERM', () => {
 
 new Cron(appInstance)
 
-serve(app)
+serve(app, (info) => {
+  console.log(`Listening on http://localhost:${info.port}`)
+})
