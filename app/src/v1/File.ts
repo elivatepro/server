@@ -226,8 +226,8 @@ export default class File extends Controller {
       })
     }
 
-    // We need to get the hash of the final contents, as it will be used
-    // by Backblaze upload
+    // We need to get the hash of the final contents. The use of sha1 came from originally
+    // using Backblaze B2 as the storage target, and that was their required format.
     const contents = note.contents()
     this.hash = await sha1(contents)
 
