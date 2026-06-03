@@ -458,6 +458,18 @@ export default class File extends Controller {
     }
   }
 
+  /**
+   * Generate a random base36 filename for the given extension, guaranteed not to
+   * collide with an existing row in the `files` table.
+   *
+   * The length comes from `filenameLength(extension)` (configurable for `html`
+   * via `FILENAME_LENGTH_HTML`). Random generation can collide, especially at
+   * short lengths, so we retry until we find a free slot.
+   *
+   * @throws HTTPException(500) if no free filename is found after
+   *   `filenameMaxAttempts` tries - the filename space is too saturated for the
+   *   configured length and `FILENAME_LENGTH_HTML` should be increased.
+   */
   async getHashFilename (extension: string) {
     const filenameMaxAttempts = 10 // Cap on retries when generating a unique random filename
     const length = this.filenameLength(extension)
@@ -469,7 +481,7 @@ export default class File extends Controller {
         // 0.140625 = 36 / 256
         name += Math.floor(bytes[i] * 0.140625).toString(36)
       }
-      if (!check.get(name, extension)) {
+      if (!check.get(name)) {
         return name
       }
     }
