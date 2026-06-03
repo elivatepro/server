@@ -267,7 +267,7 @@ export default class File extends Controller {
       // Delete the file
       try {
         await unlink(this.getFullFilePath().filePath)
-      } catch (e) {
+      } catch {
       }
 
       // Clear from Cloudflare cache
@@ -450,10 +450,12 @@ export default class File extends Controller {
     return {
       success: true,
       files: result,
-      css: css.notFound ? null : {
-        url: this.getDisplayUrl(await this.getCssFilename(), 'css'),
-        hash: css.row.hash
-      }
+      css: css.notFound
+        ? null
+        : {
+            url: this.getDisplayUrl(await this.getCssFilename(), 'css'),
+            hash: css.row.hash
+          }
     }
   }
 

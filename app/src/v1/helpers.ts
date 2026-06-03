@@ -2,8 +2,8 @@ const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function formatInt (int: number, precision: number) {
-  let tmp = int.toString(),
-    len = tmp.length
+  let tmp = int.toString()
+  const len = tmp.length
   if (len >= precision) {
     return tmp
   } else {

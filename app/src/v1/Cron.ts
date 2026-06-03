@@ -31,7 +31,7 @@ export class Cron {
       // Delete the file
       try {
         await unlink(this.paths.fullFilePath(file.filename, file.filetype).filePath)
-      } catch (e) {
+      } catch {
       }
 
       // Clear from Cloudflare cache

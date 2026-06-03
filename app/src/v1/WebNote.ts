@@ -4,7 +4,7 @@ import { checkVersion } from './helpers'
 
 const htmlTemplate = readFileSync('./src/v1/templates/note.html', 'utf8')
 const decryptionFunctions = '<script>' + readFileSync('./src/v1/templates/decrypt.js', 'utf8') + '</script>'
-const decryptionFunctions_v1_1_3 = '<script>' + readFileSync('./src/v1/templates/decrypt-v1.1.3.js', 'utf8') + '</script>'
+const decryptionFunctionsV113 = '<script>' + readFileSync('./src/v1/templates/decrypt-v1.1.3.js', 'utf8') + '</script>'
 const plaintextFunctions = '<script>initDocument();</script>'
 
 export default class WebNote {
@@ -21,12 +21,14 @@ export default class WebNote {
     assetsWebroot: 'TEMPLATE_ASSETS_WEBROOT',
     decryptionFunctions: 'TEMPLATE_DECRYPTION_FUNCTIONS'
   }
+
   private elements: { [key: string]: string } = {
     html: 'TEMPLATE_HTML',
     body: 'TEMPLATE_BODY',
     preview: 'TEMPLATE_PREVIEW',
     pusher: 'TEMPLATE_PUSHER'
   }
+
   private html: string
 
   constructor (app: App) {
@@ -105,7 +107,7 @@ export default class WebNote {
     // Add the decryption functions
     if (!checkVersion(pluginVersion, [1, 2, 0])) {
       // Legacy decryption for plugin versions < v1.2.0
-      this.replace(this.placeholders.decryptionFunctions, decryptionFunctions_v1_1_3)
+      this.replace(this.placeholders.decryptionFunctions, decryptionFunctionsV113)
     } else {
       this.replace(this.placeholders.decryptionFunctions, decryptionFunctions)
     }

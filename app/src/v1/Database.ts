@@ -42,7 +42,7 @@ export function epochToDate (sqliteDate: number) {
   return new Date(sqliteDate * 1000)
 }
 
-export type TableRow<T extends keyof DatabaseSchema> = DatabaseSchema[T];
+export type TableRow<T extends keyof DatabaseSchema> = DatabaseSchema[T]
 const db = new Database('../db/database.db')
 db.pragma('journal_mode = WAL')
 

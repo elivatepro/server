@@ -22,6 +22,7 @@ export function queryBuilder (params: QueryParams) {
         filteredParams[sanitizedField] = value
         return sanitizedField + '=?'
       }
+      return null
     })
     .filter(Boolean) // Remove null entries
 
@@ -80,7 +81,7 @@ export class MapperClass {
 
   emptyRow () {
     const row: Row = {}
-    this.fields.forEach(field => row[field] = null)
+    this.fields.forEach(field => { row[field] = null })
     return row
   }
 
