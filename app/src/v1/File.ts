@@ -23,9 +23,8 @@ export const fileExtensionWhitelist = [
   'ttf', 'otf', 'woff', 'woff2'
 ]
 
-// Length of the base36 filenames
+// Length of the base36 filenames (html length is configurable via FILENAME_LENGTH_HTML)
 const filenameLengths: { [key: string]: number } = {
-  html: 8,
   default: 20
 }
 
@@ -460,13 +459,22 @@ export default class File extends Controller {
   }
 
   async getHashFilename (extension: string) {
-    const bytes = crypto.getRandomValues(new Uint8Array(this.filenameLength(extension)))
-    let name = ''
-    for (let i = 0; i < bytes.length; i++) {
-      // 0.140625 = 36 / 256
-      name += Math.floor(bytes[i] * 0.140625).toString(36)
+    const filenameMaxAttempts = 10 // Cap on retries when generating a unique random filename
+    const length = this.filenameLength(extension)
+    const check = this.db.prepare('SELECT 1 FROM files WHERE filename = ?')
+    for (let attempt = 0; attempt < filenameMaxAttempts; attempt++) {
+      const bytes = crypto.getRandomValues(new Uint8Array(length))
+      let name = ''
+      for (let i = 0; i < bytes.length; i++) {
+        // 0.140625 = 36 / 256
+        name += Math.floor(bytes[i] * 0.140625).toString(36)
+      }
+      if (!check.get(name, extension)) {
+        return name
+      }
     }
-    return name
+    // Filename space is too saturated to find a free slot - bump FILENAME_LENGTH_HTML
+    throw new HTTPException(500)
   }
 
   /**
@@ -494,6 +502,9 @@ export default class File extends Controller {
    */
   filenameLength (optionalExtension?: string) {
     const { extension } = this.hydrate(undefined, optionalExtension)
+    if (extension === 'html') {
+      return this.app.filenameLengthHtml
+    }
     return filenameLengths[extension] || filenameLengths.default
   }
 

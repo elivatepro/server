@@ -24,7 +24,8 @@ export const appInstance: App = {
   baseWebUrl: process.env.BASE_WEB_URL?.replace(/\/*$/, '') || '',
   hashSalt: process.env.HASH_SALT || '',
   folderPrefix: parseInt(process.env.FOLDER_PREFIX || '0', 10),
-  allowNewUsers: process.env.ALLOW_NEW_USERS?.toLowerCase() !== 'false'
+  allowNewUsers: process.env.ALLOW_NEW_USERS?.toLowerCase() !== 'false',
+  filenameLengthHtml: parseInt(process.env.FILENAME_LENGTH_HTML || '8', 10)
 }
 
 const app = new Hono()
