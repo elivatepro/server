@@ -36,15 +36,9 @@ export function httpHeaderDate (date?: Date) {
   return [days[date.getUTCDay()] + ',', dateString, timeString, 'GMT'].join(' ')
 }
 
-async function sha (algorithm: string, data: string | ArrayBuffer) {
-  let uint8Array
-  if (typeof data === 'string') {
-    const encoder = new TextEncoder()
-    uint8Array = encoder.encode(data)
-  } else {
-    uint8Array = data
-  }
-  const hash = await crypto.subtle.digest(algorithm, uint8Array)
+async function sha (algorithm: string, data: string | Uint8Array | ArrayBuffer) {
+  const buffer = typeof data === 'string' ? new TextEncoder().encode(data) : data
+  const hash = await crypto.subtle.digest(algorithm, buffer as BufferSource)
   return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 

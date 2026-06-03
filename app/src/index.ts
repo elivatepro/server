@@ -14,7 +14,7 @@ import { Cron } from './v1/Cron'
 import { trackView } from './v1/routes/middleware'
 import fs from 'fs'
 
-require('dotenv').config()
+require('dotenv').config({ quiet: true })
 
 export const appInstance: App = {
   db,
