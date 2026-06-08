@@ -48,6 +48,22 @@ app.get('/v1/ping', async () => {
 // Add etags for all files
 app.use('*', etag())
 
+// Public stats resources (must be registered before the note matcher below).
+// Cached for 1 hour at the edge to match the refresh cron in Cron.ts.
+const oneHourCache = async (c: any, next: any) => {
+  await next()
+  c.header('Cache-Control', 'public, max-age=3600')
+}
+app.get('/stats', oneHourCache, serveStatic({
+  root: './static',
+  rewriteRequestPath: () => '/stats.html'
+}))
+app.get('/stats.json', oneHourCache, serveStatic({ root: '../userfiles' }))
+app.get('/stats/card.svg', oneHourCache, serveStatic({
+  root: '../userfiles',
+  rewriteRequestPath: () => '/stats-card.svg'
+}))
+
 // Rewrite note paths to the full HTML file
 app.get(
   '/:filename{^\\w{' + Math.max(1, appInstance.folderPrefix) + ',}$}',

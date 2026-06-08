@@ -50,5 +50,18 @@ db.pragma('journal_mode = WAL')
 const migration = fs.readFileSync('schema.sql', 'utf8')
 db.exec(migration)
 
+// One-shot backfill of `shares_daily` from existing notes so the historical
+// chart isn't empty on launch. Only runs if the table is empty.
+if (!db.prepare('SELECT 1 FROM shares_daily LIMIT 1').get()) {
+  db.exec(`
+    INSERT INTO shares_daily (date, new_notes)
+    SELECT unixepoch(date(created, 'unixepoch')) AS day, COUNT(*)
+    FROM files
+    WHERE filetype = 'html'
+    GROUP BY day
+    ON CONFLICT(date) DO NOTHING
+  `)
+}
+
 export type { Database as SQLite } from 'better-sqlite3'
 export default db

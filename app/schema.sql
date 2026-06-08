@@ -65,3 +65,10 @@ CREATE INDEX IF NOT EXISTS idx_logs_files_id ON logs (files_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_uid ON users (uid);
 CREATE INDEX IF NOT EXISTS idx_users_created ON users (created);
+
+CREATE TABLE IF NOT EXISTS `shares_daily`
+(
+    `date`          INTEGER NOT NULL PRIMARY KEY,
+    `new_notes`     INTEGER NOT NULL DEFAULT 0,
+    `updated_notes` INTEGER NOT NULL DEFAULT 0
+);

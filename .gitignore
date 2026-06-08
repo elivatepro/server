@@ -4,8 +4,6 @@
 .idea
 database.db*
 backup.sqlite
-/userfiles/css/*
-/userfiles/files/*
-/userfiles/notes/*
+/userfiles/
 /app/dist/*
 !.gitkeep

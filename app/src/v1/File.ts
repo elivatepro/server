@@ -329,7 +329,8 @@ export default class File extends Controller {
       this.getFileUrl()
     ])
     const date = now()
-    if (this.file.notFound) {
+    const isNew = this.file.notFound
+    if (isNew) {
       // This is a new record
       this.file.set({
         users_id: this.user.row.id,
@@ -348,6 +349,15 @@ export default class File extends Controller {
     if (!(this.file.save())) {
       throw new HTTPException(serverError(ServerErrors.FILE_FAILED_TO_SAVE))
     }
+
+    if (this.extension === 'html') {
+      const col = isNew ? 'new_notes' : 'updated_notes'
+      this.db.prepare(
+        `INSERT INTO shares_daily (date, ${col}) VALUES (unixepoch(date('now')), 1)
+         ON CONFLICT(date) DO UPDATE SET ${col} = ${col} + 1`
+      ).run()
+    }
+
     return this.file.row
   }
 

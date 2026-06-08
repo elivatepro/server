@@ -10,6 +10,73 @@ export default class Cloudflare {
     this.useTurnstile = !!(process.env.CLOUDFLARE_TURNSTILE_KEY && process.env.CLOUDFLARE_TURNSTILE_SECRET)
   }
 
+  /**
+   * Fetch the last 30 days of zone analytics from the Cloudflare GraphQL API.
+   * Returns zeros and an empty country list if zone or API key is not configured.
+   */
+  async getAnalytics () {
+    const zone = process.env.CLOUDFLARE_ZONE_ID
+    const key = process.env.CLOUDFLARE_API_KEY
+    const empty = { totalRequests: 0, totalBytes: 0, countries: [] as { code: string, requests: number }[] }
+    if (!zone || !key) return empty
+
+    const fmt = (d: Date) => d.toISOString().slice(0, 10)
+    const until = new Date()
+    const since = new Date(until.getTime() - 30 * 86400 * 1000)
+
+    const query = `
+      query ($zoneTag: String!, $since: Date!, $until: Date!) {
+        viewer {
+          zones(filter: { zoneTag: $zoneTag }) {
+            totals: httpRequests1dGroups(
+              limit: 1,
+              filter: { date_geq: $since, date_leq: $until }
+            ) {
+              sum { requests, bytes }
+            }
+            byCountry: httpRequests1dGroups(
+              limit: 50,
+              filter: { date_geq: $since, date_leq: $until },
+              orderBy: [sum_requests_DESC]
+            ) {
+              sum { requests }
+              dimensions { clientCountryName }
+            }
+          }
+        }
+      }`
+
+    try {
+      const res = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query, variables: { zoneTag: zone, since: fmt(since), until: fmt(until) } })
+      })
+      const json = await res.json() as any
+      const zoneData = json?.data?.viewer?.zones?.[0]
+      if (!zoneData) return empty
+
+      const totals = zoneData.totals?.[0]?.sum || {}
+      const countries = (zoneData.byCountry || [])
+        .map((row: any) => ({
+          code: (row.dimensions?.clientCountryName || 'XX').toUpperCase(),
+          requests: row.sum?.requests || 0
+        }))
+        .slice(0, 10)
+      return {
+        totalRequests: totals.requests || 0,
+        totalBytes: totals.bytes || 0,
+        countries
+      }
+    } catch (e) {
+      console.error('Cloudflare analytics fetch failed:', e)
+      return empty
+    }
+  }
+
   async purgeCache (urls: string[]) {
     if (process.env.CLOUDFLARE_ZONE_ID && process.env.CLOUDFLARE_API_KEY) {
       // Purge the cache if this was a file upload

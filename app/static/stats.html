@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stats - Share Note</title>
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #ffffff;
+      --text: #1a1a1a;
+      --muted: #6a6a6a;
+      --border: #e5e5e5;
+      --accent: #5b6cff;
+      --accent-soft: #c5cdff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e0e10;
+        --card: #18181b;
+        --text: #f2f2f2;
+        --muted: #9a9aa3;
+        --border: #2a2a2e;
+        --accent: #8b9bff;
+        --accent-soft: #3a467d;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 4rem;
+    }
+    header { margin-bottom: 2.5rem; }
+    h1 { font-size: 1.75rem; margin: 0 0 .25rem; }
+    .subtitle { color: var(--muted); margin: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+    .card .label {
+      color: var(--muted);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: .5rem;
+    }
+    .card .value {
+      font-size: 2rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.1;
+    }
+    .card .footnote {
+      color: var(--muted);
+      font-size: .8rem;
+      margin-top: .5rem;
+    }
+    section { margin-bottom: 3rem; }
+    section h2 {
+      font-size: 1.05rem;
+      margin: 0 0 1rem;
+      font-weight: 600;
+    }
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+    .chart-wrap { position: relative; height: 320px; }
+    .country {
+      display: grid;
+      grid-template-columns: 1.75rem 1fr auto;
+      column-gap: .75rem;
+      row-gap: .35rem;
+      padding: .65rem 0;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .country:last-child { border-bottom: none; }
+    .country .flag { font-size: 1.15rem; line-height: 1; }
+    .country .name { font-weight: 500; }
+    .country .num {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      font-size: .9rem;
+    }
+    .country .bar {
+      grid-column: 2 / 4;
+      height: 4px;
+      background: var(--accent-soft);
+      border-radius: 2px;
+    }
+    .country .bar > div {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    footer {
+      color: var(--muted);
+      font-size: .85rem;
+      margin-top: 3rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Share Note stats</h1>
+      <p class="subtitle">A snapshot of public activity over the last 30 days.</p>
+    </header>
+
+    <div class="grid">
+      <div class="card"><div class="label">Requests</div><div class="value" data-stat="requests">-</div><div class="footnote">last 30 days</div></div>
+      <div class="card"><div class="label">Bandwidth</div><div class="value" data-stat="bytes">-</div><div class="footnote">last 30 days</div></div>
+      <div class="card"><div class="label">Notes shared</div><div class="value" data-stat="notes">-</div><div class="footnote">all time</div></div>
+      <div class="card"><div class="label">Registered users</div><div class="value" data-stat="users">-</div><div class="footnote">all time</div></div>
+    </div>
+
+    <section>
+      <h2>Notes shared per day</h2>
+      <div class="panel"><div class="chart-wrap"><canvas id="shares-chart"></canvas></div></div>
+    </section>
+
+    <section>
+      <h2>Visitors by country</h2>
+      <div class="panel" id="countries"></div>
+    </section>
+
+    <footer>Updated <span id="updated">-</span></footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4/dist/chart.umd.min.js"></script>
+  <script>
+    const fmtNumber = n => (n == null ? '-' : new Intl.NumberFormat('en').format(n))
+    const fmtBytes = n => {
+      if (!n) return '0 B'
+      const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+      let i = 0
+      while (n >= 1024 && i < units.length - 1) { n /= 1024; i++ }
+      return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + ' ' + units[i]
+    }
+    const fmtDay = epoch => new Date(epoch * 1000).toLocaleDateString('en', { day: 'numeric', month: 'short' })
+    const fmtUpdated = epoch => new Date(epoch * 1000).toISOString().slice(0, 10)
+
+    const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+
+    const flagFromCode = code => {
+      if (!code || code.length !== 2 || /[^A-Z]/.test(code)) return '🌐'
+      const A = 0x1F1E6
+      const a = 'A'.charCodeAt(0)
+      return String.fromCodePoint(A + code.charCodeAt(0) - a) +
+             String.fromCodePoint(A + code.charCodeAt(1) - a)
+    }
+    const countryName = code => {
+      try { return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) || code }
+      catch { return code }
+    }
+    const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+    fetch('/stats.json')
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        document.querySelector('[data-stat="requests"]').textContent = fmtNumber(data.headline.requests)
+        document.querySelector('[data-stat="bytes"]').textContent = fmtBytes(data.headline.bytes)
+        document.querySelector('[data-stat="notes"]').textContent = fmtNumber(data.headline.notes)
+        document.querySelector('[data-stat="users"]').textContent = fmtNumber(data.headline.users)
+        document.getElementById('updated').textContent = fmtUpdated(data.updated)
+
+        renderChart(data.shares || [])
+        renderCountries(data.countries || [])
+      })
+      .catch(() => {
+        document.getElementById('updated').textContent = 'unavailable'
+      })
+
+    function renderChart (shares) {
+      new Chart(document.getElementById('shares-chart'), {
+        type: 'bar',
+        data: {
+          labels: shares.map(r => fmtDay(r.date)),
+          datasets: [
+            { label: 'New notes', data: shares.map(r => r.new_notes), backgroundColor: cssVar('--accent'), stack: 's', borderRadius: 2 },
+            { label: 'Updates', data: shares.map(r => r.updated_notes), backgroundColor: cssVar('--accent-soft'), stack: 's', borderRadius: 2 }
+          ]
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            x: { stacked: true, ticks: { color: cssVar('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
+            y: { stacked: true, beginAtZero: true, ticks: { color: cssVar('--muted') }, grid: { color: cssVar('--border') } }
+          },
+          plugins: { legend: { labels: { color: cssVar('--text') } }, tooltip: { mode: 'index', intersect: false } }
+        }
+      })
+    }
+
+    function renderCountries (countries) {
+      const top = countries.slice(0, 10)
+      if (!top.length) {
+        document.getElementById('countries').innerHTML = '<div style="color:var(--muted)">No data yet.</div>'
+        return
+      }
+      const max = Math.max(...top.map(c => c.requests), 1)
+      document.getElementById('countries').innerHTML = top.map(c => {
+        const pct = (c.requests / max * 100).toFixed(1)
+        return '<div class="country">' +
+               '<span class="flag">' + flagFromCode(c.code) + '</span>' +
+               '<span class="name">' + escapeHtml(countryName(c.code)) + '</span>' +
+               '<span class="num">' + fmtNumber(c.requests) + '</span>' +
+               '<div class="bar"><div style="width:' + pct + '%"></div></div>' +
+               '</div>'
+      }).join('')
+    }
+  </script>
+</body>
+</html>
