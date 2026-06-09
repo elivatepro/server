@@ -3,6 +3,7 @@ import db from './Database'
 import { writeFile } from 'node:fs/promises'
 
 const CHART_DAYS = 90
+const CARD_CHART_DAYS = 30
 const SECONDS_PER_DAY = 86400
 const MS_PER_DAY = SECONDS_PER_DAY * 1000
 
@@ -86,30 +87,38 @@ export class Stats {
     const sparkY = 192
     const sparkH = 52
     const sparkW = W - PAD * 2
-    const slotW = sparkW / CHART_DAYS
-    const barW = Math.max(2, slotW - 0.8)
+    const sparkBottom = sparkY + sparkH
 
-    const totals = p.shares.map(r => r.new_notes + r.updated_notes)
-    const maxTotal = Math.max(1, ...totals)
+    // Build a value-per-day array for the last CARD_CHART_DAYS days, oldest first.
     const today = Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY
-
-    const bars: string[] = []
+    const values = new Array(CARD_CHART_DAYS).fill(0) as number[]
     for (const r of p.shares) {
       const daysBack = Math.round((today - r.date) / SECONDS_PER_DAY)
-      if (daysBack < 0 || daysBack >= CHART_DAYS) continue
-      const slot = CHART_DAYS - 1 - daysBack
-      const x = PAD + slot * slotW + (slotW - barW) / 2
-      const total = r.new_notes + r.updated_notes
-      const h = (total / maxTotal) * sparkH
-      if (h > 0.3) {
-        bars.push(`<rect class="accent" x="${x.toFixed(1)}" y="${(sparkY + sparkH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}"/>`)
-      }
+      if (daysBack < 0 || daysBack >= CARD_CHART_DAYS) continue
+      values[CARD_CHART_DAYS - 1 - daysBack] = r.new_notes + r.updated_notes
     }
+    const maxValue = Math.max(...values)
+    const yScale = maxValue > 0 ? sparkH / maxValue : 0
+    const points = values.map((v, i) => ({
+      x: PAD + (i / Math.max(1, CARD_CHART_DAYS - 1)) * sparkW,
+      y: sparkBottom - v * yScale
+    }))
+
+    const linePath = smoothPath(points)
+    const areaPath = linePath
+      ? `${linePath} L ${points[points.length - 1].x.toFixed(1)},${sparkBottom} L ${points[0].x.toFixed(1)},${sparkBottom} Z`
+      : ''
+    const chart = linePath
+      ? `<path d="${areaPath}" class="area"/><path d="${linePath}" class="line"/>`
+      : ''
+    const maxLabel = maxValue > 0
+      ? `<text x="${W - PAD}" y="${sparkLabelY}" class="muted" font-size="11" text-anchor="end">max ${fmtNumber(maxValue)}</text>`
+      : ''
 
     const stats: { label: string; value: string; foot?: string }[] = [
       { label: 'REQUESTS', value: fmtNumber(p.headline.requests), foot: '30 days' },
       { label: 'BANDWIDTH', value: fmtBytes(p.headline.bytes), foot: '30 days' },
-      { label: 'NOTES', value: fmtNumber(p.headline.notes) },
+      { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes) },
       { label: 'USERS', value: fmtNumber(p.headline.users) }
     ]
     const statCards = stats.map((s, i) => {
@@ -131,6 +140,8 @@ export class Stats {
     .muted { fill: #6a6a6a; }
     .accent { fill: #5b6cff; }
     .accent-soft { fill: #c5cdff; }
+    .line { fill: none; stroke: #5b6cff; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .area { fill: #5b6cff; opacity: 0.18; }
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
     @media (prefers-color-scheme: dark) {
       .bg { fill: #18181b; stroke: #2a2a2e; }
@@ -138,14 +149,17 @@ export class Stats {
       .muted { fill: #9a9aa3; }
       .accent { fill: #8b9bff; }
       .accent-soft { fill: #3a467d; }
+      .line { stroke: #8b9bff; }
+      .area { fill: #8b9bff; }
     }
   </style>
   <rect class="bg" x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="12"/>
   <text x="${PAD}" y="${PAD + 20}" class="text" font-size="22" font-weight="700">Share Note</text>
-  <text x="${PAD}" y="${PAD + 40}" class="muted" font-size="13">Public activity · updated ${updatedStr}</text>
+  <text x="${PAD}" y="${PAD + 40}" class="muted" font-size="13">Server stats · updated ${updatedStr}</text>
   ${statCards}
-  <text x="${PAD}" y="${sparkLabelY}" class="muted" font-size="12" font-weight="600">Shares per day · last ${CHART_DAYS} days</text>
-  ${bars.join('')}
+  <text x="${PAD}" y="${sparkLabelY}" class="muted" font-size="12" font-weight="600">Shares per day · last ${CARD_CHART_DAYS} days</text>
+  ${maxLabel}
+  ${chart}
 </svg>`
   }
 }
@@ -168,4 +182,28 @@ function fmtBytes (n: number): string {
 
 function escapeXml (s: string): string {
   return s.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!)
+}
+
+/**
+ * Cardinal-spline (Catmull-Rom variant) smoothing through the given points.
+ * Tension 0.2 is mild; less prone to overshoot than the classic 0.5 form,
+ * which matters here because we don't want the line dipping below the
+ * baseline at valleys in the data.
+ */
+function smoothPath (pts: { x: number, y: number }[]): string {
+  if (pts.length < 2) return ''
+  const k = 0.2
+  let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] || p2
+    const c1x = p1.x + (p2.x - p0.x) * k
+    const c1y = p1.y + (p2.y - p0.y) * k
+    const c2x = p2.x - (p3.x - p1.x) * k
+    const c2y = p2.y - (p3.y - p1.y) * k
+    d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+  }
+  return d
 }
