@@ -49,10 +49,11 @@ app.get('/v1/ping', async () => {
 app.use('*', etag())
 
 // Public stats resources (must be registered before the note matcher below).
-// Cached for 1 hour at the edge to match the refresh cron in Cron.ts.
+// Cached at the edge to match the refresh cron in Cron.ts.
+const STATS_CACHE_SECONDS = 60 * 60 // 1 hour, matches the hourly stats cron
 const oneHourCache = async (c: any, next: any) => {
   await next()
-  c.header('Cache-Control', 'public, max-age=3600')
+  c.header('Cache-Control', `public, max-age=${STATS_CACHE_SECONDS}`)
 }
 app.get('/stats', oneHourCache, serveStatic({
   root: './static',

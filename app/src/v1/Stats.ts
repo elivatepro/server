@@ -2,13 +2,17 @@ import { App } from '../types'
 import db from './Database'
 import { writeFile } from 'node:fs/promises'
 
+const CHART_DAYS = 90
+const SECONDS_PER_DAY = 86400
+const MS_PER_DAY = SECONDS_PER_DAY * 1000
+
 type ShareRow = { date: number; new_notes: number; updated_notes: number }
 
 type Payload = {
   updated: number
   headline: { requests: number; bytes: number; notes: number; users: number }
   shares: ShareRow[]
-  countries: { code: string; requests: number }[]
+  countries: { code: string; share: number }[]
 }
 
 export class Stats {
@@ -54,7 +58,7 @@ export class Stats {
   }
 
   private queryShares (): ShareRow[] {
-    const cutoff = Math.floor(Date.now() / 1000) - 90 * 86400
+    const cutoff = Math.floor(Date.now() / 1000) - CHART_DAYS * SECONDS_PER_DAY
     return db.prepare(
       `SELECT date, new_notes, updated_notes FROM shares_daily
        WHERE date >= ? ORDER BY date ASC`
@@ -78,32 +82,27 @@ export class Stats {
     const cardW = (W - PAD * 2) / 4
 
     // Sparkline geometry
-    const SLOTS = 90
     const sparkLabelY = 184
     const sparkY = 192
     const sparkH = 52
     const sparkW = W - PAD * 2
-    const slotW = sparkW / SLOTS
+    const slotW = sparkW / CHART_DAYS
     const barW = Math.max(2, slotW - 0.8)
 
     const totals = p.shares.map(r => r.new_notes + r.updated_notes)
     const maxTotal = Math.max(1, ...totals)
-    const today = Math.floor(Date.now() / 86400000) * 86400
+    const today = Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY
 
     const bars: string[] = []
     for (const r of p.shares) {
-      const daysBack = Math.round((today - r.date) / 86400)
-      if (daysBack < 0 || daysBack >= SLOTS) continue
-      const slot = SLOTS - 1 - daysBack
+      const daysBack = Math.round((today - r.date) / SECONDS_PER_DAY)
+      if (daysBack < 0 || daysBack >= CHART_DAYS) continue
+      const slot = CHART_DAYS - 1 - daysBack
       const x = PAD + slot * slotW + (slotW - barW) / 2
-      const newH = (r.new_notes / maxTotal) * sparkH
-      const updH = (r.updated_notes / maxTotal) * sparkH
-      const top = sparkY + sparkH - newH - updH
-      if (newH > 0.3) {
-        bars.push(`<rect class="accent" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${newH.toFixed(1)}"/>`)
-      }
-      if (updH > 0.3) {
-        bars.push(`<rect class="accent-soft" x="${x.toFixed(1)}" y="${(top + newH).toFixed(1)}" width="${barW.toFixed(1)}" height="${updH.toFixed(1)}"/>`)
+      const total = r.new_notes + r.updated_notes
+      const h = (total / maxTotal) * sparkH
+      if (h > 0.3) {
+        bars.push(`<rect class="accent" x="${x.toFixed(1)}" y="${(sparkY + sparkH - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}"/>`)
       }
     }
 
@@ -145,7 +144,7 @@ export class Stats {
   <text x="${PAD}" y="${PAD + 20}" class="text" font-size="22" font-weight="700">Share Note</text>
   <text x="${PAD}" y="${PAD + 40}" class="muted" font-size="13">Public activity · updated ${updatedStr}</text>
   ${statCards}
-  <text x="${PAD}" y="${sparkLabelY}" class="muted" font-size="12" font-weight="600">Shares per day · last 90 days</text>
+  <text x="${PAD}" y="${sparkLabelY}" class="muted" font-size="12" font-weight="600">Shares per day · last ${CHART_DAYS} days</text>
   ${bars.join('')}
 </svg>`
   }
@@ -153,8 +152,8 @@ export class Stats {
 
 function fmtNumber (n: number): string {
   if (!n) return '0'
-  if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e10 ? 0 : 1) + 'B'
-  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M'
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
   if (n >= 1e4) return (n / 1e3).toFixed(0) + 'K'
   return n.toLocaleString('en-US')
 }

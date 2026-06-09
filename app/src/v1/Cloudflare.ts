@@ -3,6 +3,11 @@ import { HonoRequest } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import * as process from 'node:process'
 
+const TOP_COUNTRIES = 10
+const COUNTRY_SAMPLE_SIZE = 50
+const TOTALS_WINDOW_DAYS = 30
+const MS_PER_DAY = 86400 * 1000
+
 export default class Cloudflare {
   useTurnstile: boolean
 
@@ -17,29 +22,36 @@ export default class Cloudflare {
   async getAnalytics () {
     const zone = process.env.CLOUDFLARE_ZONE_ID
     const key = process.env.CLOUDFLARE_API_KEY
-    const empty = { totalRequests: 0, totalBytes: 0, countries: [] as { code: string, requests: number }[] }
+    const empty = { totalRequests: 0, totalBytes: 0, countries: [] as { code: string, share: number }[] }
     if (!zone || !key) return empty
 
-    const fmt = (d: Date) => d.toISOString().slice(0, 10)
-    const until = new Date()
-    const since = new Date(until.getTime() - 30 * 86400 * 1000)
+    const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
+    const fmtTime = (d: Date) => d.toISOString()
 
+    const until = new Date()
+    const totalsSince = new Date(until.getTime() - TOTALS_WINDOW_DAYS * MS_PER_DAY)
+    const countrySince = new Date(until.getTime() - MS_PER_DAY)
+
+    // Totals span 30 days (httpRequests1dGroups handles wide ranges).
+    // Country breakdown is sampled over the last 24h — that's enough to
+    // rank countries by relative share; CF Free limits adaptive groups
+    // to a 1d window
     const query = `
-      query ($zoneTag: String!, $since: Date!, $until: Date!) {
+      query ($zoneTag: String!, $tSince: Date!, $tUntil: Date!, $cSince: Time!, $cUntil: Time!) {
         viewer {
           zones(filter: { zoneTag: $zoneTag }) {
             totals: httpRequests1dGroups(
               limit: 1,
-              filter: { date_geq: $since, date_leq: $until }
+              filter: { date_geq: $tSince, date_leq: $tUntil }
             ) {
               sum { requests, bytes }
             }
-            byCountry: httpRequests1dGroups(
-              limit: 50,
-              filter: { date_geq: $since, date_leq: $until },
-              orderBy: [sum_requests_DESC]
+            byCountry: httpRequestsAdaptiveGroups(
+              limit: ${COUNTRY_SAMPLE_SIZE},
+              filter: { datetime_geq: $cSince, datetime_leq: $cUntil },
+              orderBy: [count_DESC]
             ) {
-              sum { requests }
+              count
               dimensions { clientCountryName }
             }
           }
@@ -53,19 +65,38 @@ export default class Cloudflare {
           Authorization: 'Bearer ' + key,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ query, variables: { zoneTag: zone, since: fmt(since), until: fmt(until) } })
+        body: JSON.stringify({
+          query,
+          variables: {
+            zoneTag: zone,
+            tSince: fmtDate(totalsSince),
+            tUntil: fmtDate(until),
+            cSince: fmtTime(countrySince),
+            cUntil: fmtTime(until)
+          }
+        })
       })
       const json = await res.json() as any
+      if (Array.isArray(json?.errors) && json.errors.length) {
+        console.error('Cloudflare GraphQL errors:', JSON.stringify(json.errors))
+        return empty
+      }
       const zoneData = json?.data?.viewer?.zones?.[0]
-      if (!zoneData) return empty
+      if (!zoneData) {
+        console.error('Cloudflare GraphQL: no zone returned (check zone ID or token scope)')
+        return empty
+      }
 
       const totals = zoneData.totals?.[0]?.sum || {}
-      const countries = (zoneData.byCountry || [])
-        .map((row: any) => ({
-          code: (row.dimensions?.clientCountryName || 'XX').toUpperCase(),
-          requests: row.sum?.requests || 0
-        }))
-        .slice(0, 10)
+      const allRows = (zoneData.byCountry || []).map((row: any) => ({
+        code: (row.dimensions?.clientCountryName || 'XX').toUpperCase(),
+        requests: row.count || 0
+      }))
+      const sampledTotal = allRows.reduce((acc: number, r: any) => acc + r.requests, 0)
+      const countries = allRows.slice(0, TOP_COUNTRIES).map((r: any) => ({
+        code: r.code,
+        share: sampledTotal > 0 ? r.requests / sampledTotal * 100 : 0
+      }))
       return {
         totalRequests: totals.requests || 0,
         totalBytes: totals.bytes || 0,

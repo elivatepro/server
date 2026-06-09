@@ -150,7 +150,14 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4/dist/chart.umd.min.js"></script>
   <script>
-    const fmtNumber = n => (n == null ? '-' : new Intl.NumberFormat('en').format(n))
+    const fmtNumber = n => {
+      if (n == null) return '-'
+      if (!n) return '0'
+      if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
+      if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+      if (n >= 1e4) return (n / 1e3).toFixed(0) + 'K'
+      return new Intl.NumberFormat('en').format(n)
+    }
     const fmtBytes = n => {
       if (!n) return '0 B'
       const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
@@ -198,35 +205,33 @@
         data: {
           labels: shares.map(r => fmtDay(r.date)),
           datasets: [
-            { label: 'New notes', data: shares.map(r => r.new_notes), backgroundColor: cssVar('--accent'), stack: 's', borderRadius: 2 },
-            { label: 'Updates', data: shares.map(r => r.updated_notes), backgroundColor: cssVar('--accent-soft'), stack: 's', borderRadius: 2 }
+            { label: 'Shares', data: shares.map(r => r.new_notes + r.updated_notes), backgroundColor: cssVar('--accent'), borderRadius: 2 }
           ]
         },
         options: {
           maintainAspectRatio: false,
           scales: {
-            x: { stacked: true, ticks: { color: cssVar('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
-            y: { stacked: true, beginAtZero: true, ticks: { color: cssVar('--muted') }, grid: { color: cssVar('--border') } }
+            x: { ticks: { color: cssVar('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
+            y: { beginAtZero: true, ticks: { color: cssVar('--muted') }, grid: { color: cssVar('--border') } }
           },
-          plugins: { legend: { labels: { color: cssVar('--text') } }, tooltip: { mode: 'index', intersect: false } }
+          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
         }
       })
     }
 
     function renderCountries (countries) {
-      const top = countries.slice(0, 10)
-      if (!top.length) {
+      if (!countries.length) {
         document.getElementById('countries').innerHTML = '<div style="color:var(--muted)">No data yet.</div>'
         return
       }
-      const max = Math.max(...top.map(c => c.requests), 1)
-      document.getElementById('countries').innerHTML = top.map(c => {
-        const pct = (c.requests / max * 100).toFixed(1)
+      const max = Math.max(...countries.map(c => c.share), 0.1)
+      document.getElementById('countries').innerHTML = countries.map(c => {
+        const barW = (c.share / max * 100).toFixed(1)
         return '<div class="country">' +
                '<span class="flag">' + flagFromCode(c.code) + '</span>' +
                '<span class="name">' + escapeHtml(countryName(c.code)) + '</span>' +
-               '<span class="num">' + fmtNumber(c.requests) + '</span>' +
-               '<div class="bar"><div style="width:' + pct + '%"></div></div>' +
+               '<span class="num">' + c.share.toFixed(1) + '%</span>' +
+               '<div class="bar"><div style="width:' + barW + '%"></div></div>' +
                '</div>'
       }).join('')
     }
