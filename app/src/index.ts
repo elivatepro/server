@@ -55,14 +55,23 @@ const oneHourCache = async (c: any, next: any) => {
   await next()
   c.header('Cache-Control', `public, max-age=${STATS_CACHE_SECONDS}`)
 }
-app.get('/stats', oneHourCache, serveStatic({
-  root: './static',
-  rewriteRequestPath: () => '/stats.html'
-}))
+let statsHtmlCache: string | null = null
+const renderStatsHtml = () => {
+  if (statsHtmlCache === null) {
+    const tpl = fs.readFileSync('./static/stats.html', 'utf8')
+    statsHtmlCache = tpl.replace(/\{\{baseUrl\}\}/g, appInstance.baseWebUrl)
+  }
+  return statsHtmlCache
+}
+app.get('/stats', oneHourCache, (c) => c.html(renderStatsHtml()))
 app.get('/stats.json', oneHourCache, serveStatic({ root: '../userfiles' }))
 app.get('/stats/card.svg', oneHourCache, serveStatic({
   root: '../userfiles',
   rewriteRequestPath: () => '/stats-card.svg'
+}))
+app.get('/stats/og.png', oneHourCache, serveStatic({
+  root: '../userfiles',
+  rewriteRequestPath: () => '/stats-og.png'
 }))
 
 // Rewrite note paths to the full HTML file

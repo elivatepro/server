@@ -1,6 +1,7 @@
 import { App } from '../types'
 import db from './Database'
 import { writeFile } from 'node:fs/promises'
+import { Resvg } from '@resvg/resvg-js'
 
 const CHART_DAYS = 90
 const CARD_CHART_DAYS = 30
@@ -52,9 +53,12 @@ export class Stats {
         countries: cf.countries
       }
       const dir = this.app.baseFolder + '/userfiles'
+      const svg = this.renderCard(payload)
+      const ogPng = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng()
       await Promise.all([
         writeFile(dir + '/stats.json', JSON.stringify(payload)),
-        writeFile(dir + '/stats-card.svg', this.renderCard(payload))
+        writeFile(dir + '/stats-card.svg', svg),
+        writeFile(dir + '/stats-og.png', ogPng)
       ])
     } catch (e) {
       console.error('Stats refresh failed:', e)
