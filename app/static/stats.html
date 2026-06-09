@@ -131,8 +131,8 @@
     <div class="grid">
       <div class="card"><div class="label">Requests</div><div class="value" data-stat="requests">-</div><div class="footnote">last 30 days</div></div>
       <div class="card"><div class="label">Bandwidth</div><div class="value" data-stat="bytes">-</div><div class="footnote">last 30 days</div></div>
-      <div class="card"><div class="label">Notes shared</div><div class="value" data-stat="notes">-</div><div class="footnote">all time</div></div>
-      <div class="card"><div class="label">Registered users</div><div class="value" data-stat="users">-</div><div class="footnote">all time</div></div>
+      <div class="card"><div class="label">Notes shared</div><div class="value" data-stat="notes">-</div><div class="footnote"></div></div>
+      <div class="card"><div class="label">Users</div><div class="value" data-stat="users">-</div><div class="footnote"></div></div>
     </div>
 
     <section>
@@ -214,7 +214,17 @@
             x: { ticks: { color: cssVar('--muted'), maxRotation: 0, autoSkip: true, maxTicksLimit: 10 }, grid: { display: false } },
             y: { beginAtZero: true, ticks: { color: cssVar('--muted') }, grid: { color: cssVar('--border') } }
           },
-          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+              callbacks: {
+                title: items => new Date(shares[items[0].dataIndex].date * 1000)
+                  .toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'short' })
+              }
+            }
+          }
         }
       })
     }
