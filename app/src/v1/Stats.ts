@@ -129,10 +129,10 @@ export class Stats {
     const stats: { label: string; value: string; foot?: string }[] = [
       { label: 'REQUESTS', value: fmtNumber(p.headline.requests), foot: '30 days' },
       { label: 'BANDWIDTH', value: fmtBytes(p.headline.bytes), foot: '30 days' },
-      { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes) }
+      { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes), foot: 'all time' }
     ]
     if (p.headline.runningSinceYear !== null) {
-      stats.push({ label: 'RUNNING SINCE', value: String(p.headline.runningSinceYear) })
+      stats.push({ label: 'RUNNING SINCE', value: String(p.headline.runningSinceYear), foot: 'and still free!' })
     }
     const cardW = (W - PAD * 2) / stats.length
     const statCards = stats.map((s, i) => {
