@@ -69,7 +69,7 @@ app.get('/stats/card.svg', oneHourCache, serveStatic({
   root: '../userfiles',
   rewriteRequestPath: () => '/stats-card.svg'
 }))
-app.get('/stats/og.png', oneHourCache, serveStatic({
+app.get('/stats/og-image.png', oneHourCache, serveStatic({
   root: '../userfiles',
   rewriteRequestPath: () => '/stats-og.png'
 }))

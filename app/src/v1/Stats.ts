@@ -90,18 +90,18 @@ export class Stats {
    */
   private renderCard (p: Payload): string {
     const W = 600
-    const H = 260
+    const H = 315
     const PAD = 22
 
     // Stat-card geometry (cardW depends on stats.length and is computed below)
-    const labelY = 100
-    const valueY = 132
-    const footY = 150
+    const labelY = 110
+    const valueY = 142
+    const footY = 160
 
     // Sparkline geometry
-    const sparkLabelY = 184
-    const sparkY = 192
-    const sparkH = 52
+    const sparkLabelY = 200
+    const sparkY = 210
+    const sparkH = 90
     const sparkW = W - PAD * 2
     const sparkBottom = sparkY + sparkH
 
@@ -204,6 +204,7 @@ function fmtBytes (n: number): string {
 function escapeXml (s: string): string {
   return s.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!)
 }
+
 
 /**
  * Cardinal-spline (Catmull-Rom variant) smoothing through the given points.
