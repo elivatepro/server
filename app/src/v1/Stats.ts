@@ -54,7 +54,10 @@ export class Stats {
       }
       const dir = this.app.baseFolder + '/userfiles'
       const svg = this.renderCard(payload)
-      const ogPng = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 } }).render().asPng()
+      const ogPng = new Resvg(svg, {
+        fitTo: { mode: 'width', value: 1200 },
+        font: { defaultFontFamily: 'DejaVu Sans' }
+      }).render().asPng()
       await Promise.all([
         writeFile(dir + '/stats.json', JSON.stringify(payload)),
         writeFile(dir + '/stats-card.svg', svg),

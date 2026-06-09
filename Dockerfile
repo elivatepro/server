@@ -1,5 +1,9 @@
 FROM node:lts-alpine
 
+# Fonts for server-side SVG-to-PNG rendering of the stats OG image.
+# Without these, resvg silently drops all text from the rendered card.
+RUN apk add --no-cache font-dejavu
+
 COPY app /notesx/app
 COPY db /notesx/db
 COPY userfiles /notesx/userfiles
