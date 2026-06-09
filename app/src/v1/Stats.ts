@@ -89,11 +89,13 @@ export class Stats {
     const sparkW = W - PAD * 2
     const sparkBottom = sparkY + sparkH
 
-    // Build a value-per-day array for the last CARD_CHART_DAYS days, oldest first.
-    const today = Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY
+    // Build a value-per-day array for the last CARD_CHART_DAYS complete days,
+    // oldest first. Today is excluded because it's still in progress and would
+    // otherwise render as a sharp drop on the right edge of the line.
+    const lastFullDay = Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY
     const values = new Array(CARD_CHART_DAYS).fill(0) as number[]
     for (const r of p.shares) {
-      const daysBack = Math.round((today - r.date) / SECONDS_PER_DAY)
+      const daysBack = Math.round((lastFullDay - r.date) / SECONDS_PER_DAY)
       if (daysBack < 0 || daysBack >= CARD_CHART_DAYS) continue
       values[CARD_CHART_DAYS - 1 - daysBack] = r.new_notes + r.updated_notes
     }
