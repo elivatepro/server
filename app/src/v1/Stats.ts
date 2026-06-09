@@ -156,8 +156,8 @@ export class Stats {
     }
   </style>
   <rect class="bg" x="0.5" y="0.5" width="${W - 1}" height="${H - 1}" rx="12"/>
-  <text x="${PAD}" y="${PAD + 20}" class="text" font-size="22" font-weight="700">Share Note</text>
-  <text x="${PAD}" y="${PAD + 40}" class="muted" font-size="13">Server stats · updated ${updatedStr}</text>
+  <text x="${PAD}" y="${PAD + 20}" class="text" font-size="22" font-weight="700">Server stats</text>
+  <text x="${PAD}" y="${PAD + 40}" class="muted" font-size="13">Updated ${updatedStr}</text>
   ${statCards}
   <text x="${PAD}" y="${sparkLabelY}" class="muted" font-size="12" font-weight="600">Shares per day · last ${CARD_CHART_DAYS} days</text>
   ${maxLabel}
