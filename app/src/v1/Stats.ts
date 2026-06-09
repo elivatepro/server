@@ -11,23 +11,22 @@ type ShareRow = { date: number; new_notes: number; updated_notes: number }
 
 type Payload = {
   updated: number
-  headline: { requests: number; bytes: number; notes: number; runningForYears: number | null }
+  headline: { requests: number; bytes: number; notes: number; runningSinceYear: number | null }
   shares: ShareRow[]
   countries: { code: string; share: number }[]
 }
 
 /**
- * Years between the configured service start date and now, rounded.
- * Returns null if SERVICE_START_DATE is missing or unparseable, which the
- * renderers use as the signal to hide the "Running for" card entirely.
+ * Year from SERVICE_START_DATE (UTC). Returns null if the env var is missing
+ * or unparseable, which the renderers use as the signal to hide the
+ * "Running since" card entirely.
  */
-function computeRunningForYears (): number | null {
+function computeRunningSinceYear (): number | null {
   const raw = process.env.SERVICE_START_DATE
   if (!raw) return null
   const start = new Date(raw)
   if (isNaN(start.getTime())) return null
-  const years = (Date.now() - start.getTime()) / (365.25 * MS_PER_DAY)
-  return Math.round(years)
+  return start.getUTCFullYear()
 }
 
 export class Stats {
@@ -47,7 +46,7 @@ export class Stats {
           requests: cf.totalRequests,
           bytes: cf.totalBytes,
           notes,
-          runningForYears: computeRunningForYears()
+          runningSinceYear: computeRunningSinceYear()
         },
         shares: this.queryShares(),
         countries: cf.countries
@@ -132,8 +131,8 @@ export class Stats {
       { label: 'BANDWIDTH', value: fmtBytes(p.headline.bytes), foot: '30 days' },
       { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes) }
     ]
-    if (p.headline.runningForYears !== null) {
-      stats.push({ label: 'SHARING FOR', value: p.headline.runningForYears + ' years', foot: '' })
+    if (p.headline.runningSinceYear !== null) {
+      stats.push({ label: 'RUNNING SINCE', value: String(p.headline.runningSinceYear) })
     }
     const cardW = (W - PAD * 2) / stats.length
     const statCards = stats.map((s, i) => {

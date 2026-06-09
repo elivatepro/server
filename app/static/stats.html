@@ -132,7 +132,7 @@
       <div class="card"><div class="label">Requests</div><div class="value" data-stat="requests">-</div><div class="footnote">last 30 days</div></div>
       <div class="card"><div class="label">Bandwidth</div><div class="value" data-stat="bytes">-</div><div class="footnote">last 30 days</div></div>
       <div class="card"><div class="label">Notes shared</div><div class="value" data-stat="notes">-</div><div class="footnote">all time</div></div>
-      <div class="card" data-card="runningFor" hidden><div class="label">Sharing for</div><div class="value" data-stat="runningForYears">-</div><div class="footnote"></div></div>
+      <div class="card" data-card="runningSince" hidden><div class="label">Running since</div><div class="value" data-stat="runningSinceYear">-</div></div>
     </div>
 
     <section>
@@ -189,10 +189,10 @@
         document.querySelector('[data-stat="requests"]').textContent = fmtNumber(data.headline.requests)
         document.querySelector('[data-stat="bytes"]').textContent = fmtBytes(data.headline.bytes)
         document.querySelector('[data-stat="notes"]').textContent = fmtNumber(data.headline.notes)
-        const years = data.headline.runningForYears
-        if (years != null) {
-          document.querySelector('[data-stat="runningForYears"]').textContent = years + ' years'
-          document.querySelector('[data-card="runningFor"]').hidden = false
+        const since = data.headline.runningSinceYear
+        if (since != null) {
+          document.querySelector('[data-stat="runningSinceYear"]').textContent = String(since)
+          document.querySelector('[data-card="runningSince"]').hidden = false
         }
         document.getElementById('updated').textContent = fmtUpdated(data.updated)
 
