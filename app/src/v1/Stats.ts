@@ -11,9 +11,23 @@ type ShareRow = { date: number; new_notes: number; updated_notes: number }
 
 type Payload = {
   updated: number
-  headline: { requests: number; bytes: number; notes: number; users: number }
+  headline: { requests: number; bytes: number; notes: number; runningForYears: number | null }
   shares: ShareRow[]
   countries: { code: string; share: number }[]
+}
+
+/**
+ * Years between the configured service start date and now, rounded.
+ * Returns null if SERVICE_START_DATE is missing or unparseable, which the
+ * renderers use as the signal to hide the "Running for" card entirely.
+ */
+function computeRunningForYears (): number | null {
+  const raw = process.env.SERVICE_START_DATE
+  if (!raw) return null
+  const start = new Date(raw)
+  if (isNaN(start.getTime())) return null
+  const years = (Date.now() - start.getTime()) / (365.25 * MS_PER_DAY)
+  return Math.round(years)
 }
 
 export class Stats {
@@ -25,7 +39,7 @@ export class Stats {
 
   async refresh () {
     try {
-      const { notes, users } = this.queryDb()
+      const { notes } = this.queryDb()
       const cf = await this.app.cloudflare.getAnalytics()
       const payload: Payload = {
         updated: Math.floor(Date.now() / 1000),
@@ -33,7 +47,7 @@ export class Stats {
           requests: cf.totalRequests,
           bytes: cf.totalBytes,
           notes,
-          users
+          runningForYears: computeRunningForYears()
         },
         shares: this.queryShares(),
         countries: cf.countries
@@ -52,10 +66,7 @@ export class Stats {
     const notes = (db.prepare(
       "SELECT COUNT(*) AS n FROM files WHERE filetype = 'html'"
     ).get() as { n: number }).n
-    const users = (db.prepare(
-      'SELECT COUNT(*) AS n FROM users'
-    ).get() as { n: number }).n
-    return { notes, users }
+    return { notes }
   }
 
   private queryShares (): ShareRow[] {
@@ -76,11 +87,10 @@ export class Stats {
     const H = 260
     const PAD = 22
 
-    // Stat-card geometry
+    // Stat-card geometry (cardW depends on stats.length and is computed below)
     const labelY = 100
     const valueY = 132
     const footY = 150
-    const cardW = (W - PAD * 2) / 4
 
     // Sparkline geometry
     const sparkLabelY = 184
@@ -120,9 +130,12 @@ export class Stats {
     const stats: { label: string; value: string; foot?: string }[] = [
       { label: 'REQUESTS', value: fmtNumber(p.headline.requests), foot: '30 days' },
       { label: 'BANDWIDTH', value: fmtBytes(p.headline.bytes), foot: '30 days' },
-      { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes) },
-      { label: 'USERS', value: fmtNumber(p.headline.users) }
+      { label: 'SHARED NOTES', value: fmtNumber(p.headline.notes) }
     ]
+    if (p.headline.runningForYears !== null) {
+      stats.push({ label: 'SHARING FOR', value: p.headline.runningForYears + ' years', foot: '' })
+    }
+    const cardW = (W - PAD * 2) / stats.length
     const statCards = stats.map((s, i) => {
       const x = PAD + i * cardW
       let out = `<text x="${x}" y="${labelY}" class="muted" font-size="12" font-weight="600" letter-spacing="0.6">${s.label}</text>` +
