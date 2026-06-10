@@ -58,20 +58,10 @@ export class Stats {
         fitTo: { mode: 'width', value: 1200 },
         font: { defaultFontFamily: 'DejaVu Sans' }
       }).render().asPng()
-
       await Promise.all([
         writeFile(dir + '/stats.json', JSON.stringify(payload)),
         writeFile(dir + '/stats-card.svg', svg),
         writeFile(dir + '/stats-og.png', ogPng)
-      ])
-
-      // The freshly written files are fronted by Cloudflare, so purge them or
-      // the edge keeps serving the previous hour's snapshot until its TTL lapses.
-      const base = this.app.baseWebUrl
-      await this.app.cloudflare.purgeCache([
-        base + '/stats.json',
-        base + '/stats/card.svg',
-        base + '/stats/og-image.png'
       ])
     } catch (e) {
       console.error('Stats refresh failed:', e)
