@@ -1,5 +1,23 @@
 function initDocument() {
   /*
+   * MathJax stylesheet
+   * Notes published before the server hosted the complete MathJax CHTML
+   * stylesheet only carry the partial glyph CSS captured from Obsidian, so
+   * their equations are missing letters (especially Greek). Those notes can't
+   * be fixed without re-sharing - except that they all load this file. If the
+   * note contains rendered math and isn't already linking the stylesheet, add
+   * it now. Newer notes link it server-side, so this is a no-op for them.
+   * https://github.com/alangrainger/share-note/issues/34
+   */
+  if (document.querySelector('mjx-container') &&
+      !document.querySelector('link[href$="/assets/mathjax/mathjax.css"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = window.location.origin + '/assets/mathjax/mathjax.css';
+    document.head.appendChild(link);
+  }
+
+  /*
    * Callout fold/unfold
    */
   document.querySelectorAll('.callout.is-collapsible > .callout-title')
