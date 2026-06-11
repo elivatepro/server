@@ -119,7 +119,14 @@ export default class WebNote {
 
   enableMathjax (enable = false) {
     if (enable) {
-      this.replace(this.placeholders.scripts, `<script async src="${this.app.baseWebUrl}/assets/mathjax@3.2.2_es5_tex-chtml-full.js"></script>`)
+      // Equations are captured from Obsidian already rendered as MathJax CHTML
+      // markup, so the note only needs the matching glyph CSS - not the runtime
+      // typesetter. We serve the complete CHTML stylesheet (every glyph in every
+      // font, generated with adaptiveCSS:false) rather than relying on the
+      // partial #MJX-CHTML-styles sheet the client captures, which only contains
+      // glyphs that happened to render during the Obsidian session and silently
+      // drops the rest. https://github.com/alangrainger/share-note/issues/34
+      this.replace(this.placeholders.scripts, `<link rel="stylesheet" href="${this.app.baseWebUrl}/assets/mathjax/mathjax.css">`)
     }
   }
 
