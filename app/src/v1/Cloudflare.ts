@@ -6,6 +6,9 @@ import * as process from 'node:process'
 const TOP_COUNTRIES = 10
 const COUNTRY_SAMPLE_SIZE = 50
 const TOTALS_WINDOW_DAYS = 30
+// Capped at 3 days because the CF Free plan only retains adaptive analytics
+// for ~3 days - asking for more just returns empty windows for the older days.
+const COUNTRY_WINDOW_DAYS = 3
 const MS_PER_DAY = 86400 * 1000
 
 export default class Cloudflare {
@@ -30,14 +33,36 @@ export default class Cloudflare {
 
     const until = new Date()
     const totalsSince = new Date(until.getTime() - TOTALS_WINDOW_DAYS * MS_PER_DAY)
-    const countrySince = new Date(until.getTime() - MS_PER_DAY)
+
+    // The CF Free plan limits httpRequestsAdaptiveGroups to a 1d window per
+    // query, so to cover the last few days we batch one aliased field per day,
+    // each scoped to its own 24h window, then sum the per-country counts below.
+    const dayWindows: { since: string, until: string }[] = []
+    for (let i = 0; i < COUNTRY_WINDOW_DAYS; i++) {
+      dayWindows.push({
+        since: fmtTime(new Date(until.getTime() - (i + 1) * MS_PER_DAY)),
+        until: fmtTime(new Date(until.getTime() - i * MS_PER_DAY))
+      })
+    }
+
+    const dayVarDecls = dayWindows
+      .map((_, i) => `$cSince${i}: Time!, $cUntil${i}: Time!`)
+      .join(', ')
+    const dayFields = dayWindows
+      .map((_, i) => `
+            byCountry${i}: httpRequestsAdaptiveGroups(
+              limit: ${COUNTRY_SAMPLE_SIZE},
+              filter: { datetime_geq: $cSince${i}, datetime_leq: $cUntil${i} },
+              orderBy: [count_DESC]
+            ) {
+              count
+              dimensions { clientCountryName }
+            }`)
+      .join('')
 
     // Totals span 30 days (httpRequests1dGroups handles wide ranges).
-    // Country breakdown is sampled over the last 24h — that's enough to
-    // rank countries by relative share; CF Free limits adaptive groups
-    // to a 1d window
     const query = `
-      query ($zoneTag: String!, $tSince: Date!, $tUntil: Date!, $cSince: Time!, $cUntil: Time!) {
+      query ($zoneTag: String!, $tSince: Date!, $tUntil: Date!, ${dayVarDecls}) {
         viewer {
           zones(filter: { zoneTag: $zoneTag }) {
             totals: httpRequests1dGroups(
@@ -45,15 +70,7 @@ export default class Cloudflare {
               filter: { date_geq: $tSince, date_leq: $tUntil }
             ) {
               sum { requests, bytes }
-            }
-            byCountry: httpRequestsAdaptiveGroups(
-              limit: ${COUNTRY_SAMPLE_SIZE},
-              filter: { datetime_geq: $cSince, datetime_leq: $cUntil },
-              orderBy: [count_DESC]
-            ) {
-              count
-              dimensions { clientCountryName }
-            }
+            }${dayFields}
           }
         }
       }`
@@ -71,8 +88,10 @@ export default class Cloudflare {
             zoneTag: zone,
             tSince: fmtDate(totalsSince),
             tUntil: fmtDate(until),
-            cSince: fmtTime(countrySince),
-            cUntil: fmtTime(until)
+            ...Object.fromEntries(dayWindows.flatMap((w, i) => [
+              [`cSince${i}`, w.since],
+              [`cUntil${i}`, w.until]
+            ]))
           }
         })
       })
@@ -88,10 +107,18 @@ export default class Cloudflare {
       }
 
       const totals = zoneData.totals?.[0]?.sum || {}
-      const allRows = (zoneData.byCountry || []).map((row: any) => ({
-        code: (row.dimensions?.clientCountryName || 'XX').toUpperCase(),
-        requests: row.count || 0
-      }))
+
+      // Sum the per-day country breakdowns into a single count per country.
+      const countByCode = new Map<string, number>()
+      for (let i = 0; i < dayWindows.length; i++) {
+        for (const row of (zoneData[`byCountry${i}`] || [])) {
+          const code = (row.dimensions?.clientCountryName || 'XX').toUpperCase()
+          countByCode.set(code, (countByCode.get(code) || 0) + (row.count || 0))
+        }
+      }
+      const allRows = [...countByCode.entries()]
+        .map(([code, requests]) => ({ code, requests }))
+        .sort((a, b) => b.requests - a.requests)
       const sampledTotal = allRows.reduce((acc: number, r: any) => acc + r.requests, 0)
       const countries = allRows.slice(0, TOP_COUNTRIES).map((r: any) => ({
         code: r.code,
