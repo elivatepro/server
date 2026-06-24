@@ -72,3 +72,27 @@ CREATE TABLE IF NOT EXISTS `shares_daily`
     `new_notes`     INTEGER NOT NULL DEFAULT 0,
     `updated_notes` INTEGER NOT NULL DEFAULT 0
 );
+
+-- Per-day Cloudflare zone analytics, snapshotted before CF ages them out.
+-- `date` is the unix epoch of the day's start (UTC), matching shares_daily.
+CREATE TABLE IF NOT EXISTS `cf_daily`
+(
+    `date`            INTEGER NOT NULL PRIMARY KEY,
+    `requests`        INTEGER NOT NULL DEFAULT 0,
+    `bytes`           INTEGER NOT NULL DEFAULT 0,
+    `cached_requests` INTEGER NOT NULL DEFAULT 0,
+    `cached_bytes`    INTEGER NOT NULL DEFAULT 0,
+    `page_views`      INTEGER NOT NULL DEFAULT 0,
+    `threats`         INTEGER NOT NULL DEFAULT 0,
+    `uniques`         INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS `cf_country_daily`
+(
+    `date`     INTEGER NOT NULL,
+    `country`  TEXT    NOT NULL,
+    `requests` INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (`date`, `country`)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cf_country_daily_date ON cf_country_daily (date);

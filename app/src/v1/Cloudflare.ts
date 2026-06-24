@@ -3,13 +3,24 @@ import { HonoRequest } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import * as process from 'node:process'
 
-const TOP_COUNTRIES = 10
+// Top countries to keep per day, aligned with CF's per-query limit. Bounds
+// cf_country_daily growth while keeping long-window roll-ups accurate.
 const COUNTRY_SAMPLE_SIZE = 50
-const TOTALS_WINDOW_DAYS = 30
-// Capped at 3 days because the CF Free plan only retains adaptive analytics
-// for ~3 days - asking for more just returns empty windows for the older days.
-const COUNTRY_WINDOW_DAYS = 3
-const MS_PER_DAY = 86400 * 1000
+
+/** One finalised UTC day of zone analytics from `httpRequests1dGroups`. */
+export type CfDayRow = {
+  /** Unix epoch of the day's start (UTC). */
+  date: number
+  requests: number
+  bytes: number
+  cachedRequests: number
+  cachedBytes: number
+  pageViews: number
+  threats: number
+  uniques: number
+  /** Top `COUNTRY_SAMPLE_SIZE` countries that day, by request count. */
+  countries: { code: string, requests: number }[]
+}
 
 export default class Cloudflare {
   useTurnstile: boolean
@@ -19,58 +30,39 @@ export default class Cloudflare {
   }
 
   /**
-   * Fetch the last 30 days of zone analytics from the Cloudflare GraphQL API.
-   * Returns zeros and an empty country list if zone or API key is not configured.
+   * Fetch finalised daily zone analytics from the Cloudflare GraphQL API for
+   * every complete UTC day in [since, until] inclusive. `httpRequests1dGroups`
+   * retains roughly a year on the Free plan and caps a single query at ~52
+   * weeks, so callers must keep the range within that window. Returns an empty
+   * array if zone/API key is unconfigured or the request fails.
    */
-  async getAnalytics () {
+  async getDailyAnalytics (since: Date, until: Date): Promise<CfDayRow[]> {
     const zone = process.env.CLOUDFLARE_ZONE_ID
     const key = process.env.CLOUDFLARE_API_KEY
-    const empty = { totalRequests: 0, totalBytes: 0, countries: [] as { code: string, share: number }[] }
-    if (!zone || !key) return empty
+    if (!zone || !key) return []
 
     const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
-    const fmtTime = (d: Date) => d.toISOString()
-
-    const until = new Date()
-    const totalsSince = new Date(until.getTime() - TOTALS_WINDOW_DAYS * MS_PER_DAY)
-
-    // The CF Free plan limits httpRequestsAdaptiveGroups to a 1d window per
-    // query, so to cover the last few days we batch one aliased field per day,
-    // each scoped to its own 24h window, then sum the per-country counts below.
-    const dayWindows: { since: string, until: string }[] = []
-    for (let i = 0; i < COUNTRY_WINDOW_DAYS; i++) {
-      dayWindows.push({
-        since: fmtTime(new Date(until.getTime() - (i + 1) * MS_PER_DAY)),
-        until: fmtTime(new Date(until.getTime() - i * MS_PER_DAY))
-      })
-    }
-
-    const dayVarDecls = dayWindows
-      .map((_, i) => `$cSince${i}: Time!, $cUntil${i}: Time!`)
-      .join(', ')
-    const dayFields = dayWindows
-      .map((_, i) => `
-            byCountry${i}: httpRequestsAdaptiveGroups(
-              limit: ${COUNTRY_SAMPLE_SIZE},
-              filter: { datetime_geq: $cSince${i}, datetime_leq: $cUntil${i} },
-              orderBy: [count_DESC]
-            ) {
-              count
-              dimensions { clientCountryName }
-            }`)
-      .join('')
-
-    // Totals span 30 days (httpRequests1dGroups handles wide ranges).
     const query = `
-      query ($zoneTag: String!, $tSince: Date!, $tUntil: Date!, ${dayVarDecls}) {
+      query ($zoneTag: String!, $since: Date!, $until: Date!) {
         viewer {
           zones(filter: { zoneTag: $zoneTag }) {
-            totals: httpRequests1dGroups(
-              limit: 1,
-              filter: { date_geq: $tSince, date_leq: $tUntil }
+            httpRequests1dGroups(
+              limit: 1000,
+              filter: { date_geq: $since, date_leq: $until },
+              orderBy: [date_ASC]
             ) {
-              sum { requests, bytes }
-            }${dayFields}
+              dimensions { date }
+              sum {
+                requests
+                bytes
+                cachedRequests
+                cachedBytes
+                pageViews
+                threats
+                countryMap { clientCountryName requests }
+              }
+              uniq { uniques }
+            }
           }
         }
       }`
@@ -84,54 +76,42 @@ export default class Cloudflare {
         },
         body: JSON.stringify({
           query,
-          variables: {
-            zoneTag: zone,
-            tSince: fmtDate(totalsSince),
-            tUntil: fmtDate(until),
-            ...Object.fromEntries(dayWindows.flatMap((w, i) => [
-              [`cSince${i}`, w.since],
-              [`cUntil${i}`, w.until]
-            ]))
-          }
+          variables: { zoneTag: zone, since: fmtDate(since), until: fmtDate(until) }
         })
       })
       const json = await res.json() as any
       if (Array.isArray(json?.errors) && json.errors.length) {
         console.error('Cloudflare GraphQL errors:', JSON.stringify(json.errors))
-        return empty
+        return []
       }
-      const zoneData = json?.data?.viewer?.zones?.[0]
-      if (!zoneData) {
+      const groups = json?.data?.viewer?.zones?.[0]?.httpRequests1dGroups
+      if (!groups) {
         console.error('Cloudflare GraphQL: no zone returned (check zone ID or token scope)')
-        return empty
+        return []
       }
 
-      const totals = zoneData.totals?.[0]?.sum || {}
-
-      // Sum the per-day country breakdowns into a single count per country.
-      const countByCode = new Map<string, number>()
-      for (let i = 0; i < dayWindows.length; i++) {
-        for (const row of (zoneData[`byCountry${i}`] || [])) {
-          const code = (row.dimensions?.clientCountryName || 'XX').toUpperCase()
-          countByCode.set(code, (countByCode.get(code) || 0) + (row.count || 0))
+      return groups.map((g: any): CfDayRow => {
+        const sum = g.sum || {}
+        // countryMap order isn't guaranteed, so sort and cap it ourselves.
+        const countries = ((sum.countryMap || []) as any[])
+          .map(c => ({ code: (c.clientCountryName || 'XX').toUpperCase(), requests: c.requests || 0 }))
+          .sort((a, b) => b.requests - a.requests)
+          .slice(0, COUNTRY_SAMPLE_SIZE)
+        return {
+          date: Math.floor(Date.parse(g.dimensions.date + 'T00:00:00Z') / 1000),
+          requests: sum.requests || 0,
+          bytes: sum.bytes || 0,
+          cachedRequests: sum.cachedRequests || 0,
+          cachedBytes: sum.cachedBytes || 0,
+          pageViews: sum.pageViews || 0,
+          threats: sum.threats || 0,
+          uniques: g.uniq?.uniques || 0,
+          countries
         }
-      }
-      const allRows = [...countByCode.entries()]
-        .map(([code, requests]) => ({ code, requests }))
-        .sort((a, b) => b.requests - a.requests)
-      const sampledTotal = allRows.reduce((acc: number, r: any) => acc + r.requests, 0)
-      const countries = allRows.slice(0, TOP_COUNTRIES).map((r: any) => ({
-        code: r.code,
-        share: sampledTotal > 0 ? r.requests / sampledTotal * 100 : 0
-      }))
-      return {
-        totalRequests: totals.requests || 0,
-        totalBytes: totals.bytes || 0,
-        countries
-      }
+      })
     } catch (e) {
       console.error('Cloudflare analytics fetch failed:', e)
-      return empty
+      return []
     }
   }
 

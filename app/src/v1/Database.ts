@@ -27,7 +27,22 @@ interface DatabaseSchema {
     created: string;
     validated: string | null;
     revoked: string | null;
-  }
+  };
+  cf_daily: {
+    date: number;
+    requests: number;
+    bytes: number;
+    cached_requests: number;
+    cached_bytes: number;
+    page_views: number;
+    threats: number;
+    uniques: number;
+  };
+  cf_country_daily: {
+    date: number;
+    country: string;
+    requests: number;
+  };
 }
 
 export function now () {

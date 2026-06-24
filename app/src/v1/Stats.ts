@@ -1,5 +1,6 @@
 import { App } from '../types'
 import db from './Database'
+import { CfDayRow } from './Cloudflare'
 import { writeFile } from 'node:fs/promises'
 import { Resvg } from '@resvg/resvg-js'
 
@@ -7,6 +8,26 @@ const CHART_DAYS = 90
 const CARD_CHART_DAYS = 30
 const SECONDS_PER_DAY = 86400
 const MS_PER_DAY = SECONDS_PER_DAY * 1000
+
+// Window for the headline totals and country breakdown, in complete days.
+const TOTALS_WINDOW_DAYS = 30
+// Countries shown on the card (shares are of all sampled traffic in the window).
+const TOP_COUNTRIES = 10
+// First-run backfill depth. CF caps a single 1dGroups query at ~52 weeks; 360
+// days leaves margin for the time-of-day component of that limit.
+const BACKFILL_DAYS = 360
+
+// cf_daily columns mapped to their CfDayRow source field, so the upsert SQL
+// and its bound values are built from one list rather than repeated by hand.
+const CF_DAILY_COLUMNS: { col: string, key: keyof CfDayRow }[] = [
+  { col: 'requests', key: 'requests' },
+  { col: 'bytes', key: 'bytes' },
+  { col: 'cached_requests', key: 'cachedRequests' },
+  { col: 'cached_bytes', key: 'cachedBytes' },
+  { col: 'page_views', key: 'pageViews' },
+  { col: 'threats', key: 'threats' },
+  { col: 'uniques', key: 'uniques' }
+]
 
 type ShareRow = { date: number; new_notes: number; updated_notes: number }
 
@@ -30,6 +51,16 @@ function computeRunningSinceYear (): number | null {
   return start.getUTCFullYear()
 }
 
+/** Unix epoch (seconds) of the start of the most recent complete UTC day. */
+function lastCompleteDayEpoch (): number {
+  return Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY
+}
+
+/** Earliest day (inclusive) of the TOTALS_WINDOW_DAYS-day headline window. */
+function totalsWindowCutoff (): number {
+  return lastCompleteDayEpoch() - (TOTALS_WINDOW_DAYS - 1) * SECONDS_PER_DAY
+}
+
 export class Stats {
   app: App
 
@@ -37,20 +68,69 @@ export class Stats {
     this.app = app
   }
 
+  /**
+   * On first run, backfill cf_daily from whatever CF still retains (~1 year)
+   * so the stats start with history rather than a single day. No-op once the
+   * table has any rows.
+   */
+  async backfillIfEmpty () {
+    if (db.prepare('SELECT 1 FROM cf_daily LIMIT 1').get()) return
+    const lastFull = new Date(Date.now() - MS_PER_DAY)
+    const since = new Date(Date.now() - BACKFILL_DAYS * MS_PER_DAY)
+    const n = await this.ingest(since, lastFull)
+    if (n) console.log(`Backfilled ${n} days of Cloudflare analytics`)
+  }
+
+  /** Ingest the most recent complete UTC day. Run daily, just after midnight. */
+  async ingestYesterday () {
+    const yesterday = new Date(Date.now() - MS_PER_DAY)
+    if (await this.ingest(yesterday, yesterday)) await this.refresh()
+  }
+
+  /**
+   * Snapshot every complete CF day in [since, until] into cf_daily and
+   * cf_country_daily. Idempotent - re-running a day upserts in place - so both
+   * the daily cron (one day) and the first-run backfill (a wide range) share it.
+   * Returns the number of days written.
+   */
+  private async ingest (since: Date, until: Date): Promise<number> {
+    const rows = await this.app.cloudflare.getDailyAnalytics(since, until)
+    if (!rows.length) return 0
+
+    const cols = CF_DAILY_COLUMNS.map(c => c.col)
+    const dailyStmt = db.prepare(
+      `INSERT INTO cf_daily (date, ${cols.join(', ')})
+       VALUES (?, ${cols.map(() => '?').join(', ')})
+       ON CONFLICT(date) DO UPDATE SET ${cols.map(c => `${c} = excluded.${c}`).join(', ')}`
+    )
+    const countryStmt = db.prepare(
+      `INSERT INTO cf_country_daily (date, country, requests) VALUES (?, ?, ?)
+       ON CONFLICT(date, country) DO UPDATE SET requests = excluded.requests`
+    )
+    const write = db.transaction((days: CfDayRow[]) => {
+      for (const d of days) {
+        dailyStmt.run(d.date, ...CF_DAILY_COLUMNS.map(c => d[c.key] as number))
+        for (const c of d.countries) countryStmt.run(d.date, c.code, c.requests)
+      }
+    })
+    write(rows)
+    return rows.length
+  }
+
   async refresh () {
     try {
       const { notes } = this.queryDb()
-      const cf = await this.app.cloudflare.getAnalytics()
+      const totals = this.queryCfTotals()
       const payload: Payload = {
         updated: Math.floor(Date.now() / 1000),
         headline: {
-          requests: cf.totalRequests,
-          bytes: cf.totalBytes,
+          requests: totals.requests,
+          bytes: totals.bytes,
           notes,
           runningSinceYear: computeRunningSinceYear()
         },
         shares: this.queryShares(),
-        countries: cf.countries
+        countries: this.queryCountries()
       }
       const dir = this.app.baseFolder + '/userfiles'
       const svg = this.renderCard(payload)
@@ -83,6 +163,31 @@ export class Stats {
     ).all(cutoff) as ShareRow[]
   }
 
+  /** Headline request/bandwidth totals over the last TOTALS_WINDOW_DAYS complete days. */
+  private queryCfTotals () {
+    return db.prepare(
+      `SELECT COALESCE(SUM(requests), 0) AS requests, COALESCE(SUM(bytes), 0) AS bytes
+       FROM cf_daily WHERE date >= ?`
+    ).get(totalsWindowCutoff()) as { requests: number; bytes: number }
+  }
+
+  /**
+   * Top TOP_COUNTRIES countries by requests over the last TOTALS_WINDOW_DAYS
+   * complete days. Shares are of all traffic in the window (so the top N can
+   * sum to under 100%), matching the previous live behaviour.
+   */
+  private queryCountries (): { code: string; share: number }[] {
+    const cutoff = totalsWindowCutoff()
+    const total = (db.prepare(
+      'SELECT COALESCE(SUM(requests), 0) AS total FROM cf_country_daily WHERE date >= ?'
+    ).get(cutoff) as { total: number }).total
+    const rows = db.prepare(
+      `SELECT country, SUM(requests) AS requests FROM cf_country_daily
+       WHERE date >= ? GROUP BY country ORDER BY requests DESC LIMIT ?`
+    ).all(cutoff, TOP_COUNTRIES) as { country: string; requests: number }[]
+    return rows.map(r => ({ code: r.country, share: total > 0 ? r.requests / total * 100 : 0 }))
+  }
+
   /**
    * Render a README-embeddable SVG card. Dark/light theming is handled by an
    * embedded prefers-color-scheme media query, which GitHub's image proxy
@@ -108,7 +213,7 @@ export class Stats {
     // Build a value-per-day array for the last CARD_CHART_DAYS complete days,
     // oldest first. Today is excluded because it's still in progress and would
     // otherwise render as a sharp drop on the right edge of the line.
-    const lastFullDay = Math.floor(Date.now() / MS_PER_DAY) * SECONDS_PER_DAY - SECONDS_PER_DAY
+    const lastFullDay = lastCompleteDayEpoch()
     const values = new Array(CARD_CHART_DAYS).fill(0) as number[]
     for (const r of p.shares) {
       const daysBack = Math.round((lastFullDay - r.date) / SECONDS_PER_DAY)
@@ -204,7 +309,6 @@ function fmtBytes (n: number): string {
 function escapeXml (s: string): string {
   return s.replace(/[<>&"']/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!)
 }
-
 
 /**
  * Cardinal-spline (Catmull-Rom variant) smoothing through the given points.

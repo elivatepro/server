@@ -22,9 +22,15 @@ export class Cron {
     // Backup the database daily
     cron.schedule('0 0 * * *', () => this.backupDatabase())
 
-    // Refresh the public stats snapshot hourly, plus once on boot
+    // Refresh the public stats snapshot hourly
     cron.schedule('0 * * * *', () => this.stats.refresh())
-    this.stats.refresh()
+
+    // Snapshot the previous complete day's Cloudflare analytics into our own DB
+    // (CF has finalised it by 00:30 UTC) so we keep them beyond CF's retention.
+    cron.schedule('30 0 * * *', () => this.stats.ingestYesterday())
+
+    // On boot: backfill CF history on first run, then render the snapshot.
+    this.stats.backfillIfEmpty().then(() => this.stats.refresh())
   }
 
   async deleteExpiredFiles () {
