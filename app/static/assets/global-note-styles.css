@@ -11,6 +11,17 @@
     --boko-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* SAFETY NET — note content is ALWAYS visible. Nothing below (animation,
+ * inherited theme, JS timing) may hide it. This is deliberately first so the
+ * entrance animation can only ever be additive on top of visible content. */
+.markdown-preview-view,
+.markdown-preview-sizer,
+.markdown-preview-sizer > *,
+#template-user-data {
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
 html, body {
     overflow-x: hidden !important;
     overflow-y: visible !important;
@@ -194,19 +205,17 @@ div.view-content {
                 0 18px 40px -24px color-mix(in srgb, currentColor 30%, transparent);
 }
 
-/* Gentle fade-up as the note settles in. */
+/* Gentle settle-in as the note appears. Transform-only so it can NEVER hide
+ * content (opacity is locked to 1 by the safety net above); even if the
+ * animation never fires, content is fully visible. */
 @media (prefers-reduced-motion: no-preference) {
     .markdown-preview-sizer > * {
-        animation: boko-fade-up 600ms var(--boko-ease) both;
+        animation: boko-settle 550ms var(--boko-ease);
     }
-    @keyframes boko-fade-up {
-        from { opacity: 0; transform: translateY(8px); }
-        to   { opacity: 1; transform: translateY(0); }
+    @keyframes boko-settle {
+        0%   { transform: translateY(7px); }
+        100% { transform: translateY(0); }
     }
-}
-@media (prefers-reduced-motion: reduce) {
-    .markdown-preview-sizer > * { animation: none; }
-    * { transition-duration: 0.01ms !important; }
 }
 
 /* Mobile refinements. */
