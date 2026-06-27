@@ -11,15 +11,45 @@
     --boko-ease: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* SAFETY NET — note content is ALWAYS visible. Nothing below (animation,
- * inherited theme, JS timing) may hide it. This is deliberately first so the
- * entrance animation can only ever be additive on top of visible content. */
+/* SAFETY NET — note content is ALWAYS visible and readable. Nothing below
+ * (animation, inherited theme, JS timing) may hide it. Deliberately first. */
 .markdown-preview-view,
 .markdown-preview-sizer,
 .markdown-preview-sizer > *,
 #template-user-data {
     opacity: 1 !important;
     visibility: visible !important;
+}
+
+/* Guarantee readable text on a known ground, per theme. The note's captured
+ * Obsidian theme may not define --text-normal here, which left body text the
+ * same colour as the background (invisible) while the TOC — which has explicit
+ * fallbacks — still showed. Set safe defaults that the theme can override. */
+:root {
+    --boko-ink: #20242b;
+    --boko-ground: #ffffff;
+}
+body.theme-dark {
+    --boko-ink: #e6e6e6;
+    --boko-ground: #14161a;
+}
+body {
+    background-color: var(--background-primary, var(--boko-ground));
+    color: var(--text-normal, var(--boko-ink));
+}
+.markdown-preview-section,
+.markdown-preview-section p,
+.markdown-preview-section li,
+.markdown-preview-section h1,
+.markdown-preview-section h2,
+.markdown-preview-section h3,
+.markdown-preview-section h4,
+.markdown-preview-section h5,
+.markdown-preview-section h6,
+.markdown-preview-section td,
+.markdown-preview-section th,
+.markdown-preview-section strong {
+    color: var(--text-normal, var(--boko-ink));
 }
 
 html, body {
