@@ -25,7 +25,7 @@ router
 
       // Generate the HTML response
       const head = `<meta http-equiv='Refresh' content='3; URL=obsidian://share-note?key=${keyData.key}' />`
-      const body = `<h3>Successfully connected Share Note!</h3>
+      const body = `<h3>Successfully connected to Boko OS!</h3>
         <p>This will only happen once 😊</p>
         <p>You should now be automatically sent back to Obsidian and the setup will complete.
         If you want to do it manually, you can copy and paste this value into the settings page,
