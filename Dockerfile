@@ -7,8 +7,10 @@ RUN apk add --no-cache font-dejavu
 COPY app /notesx/app
 COPY db /notesx/db
 COPY userfiles /notesx/userfiles
-COPY docker-entrypoint.sh /notesx/docker-entrypoint.sh
-RUN chmod +x /notesx/docker-entrypoint.sh
+# Keep the entrypoint OUTSIDE /notesx: a persistent volume mounted at /notesx
+# (e.g. on Railway) would otherwise shadow it and the file would vanish at runtime.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 WORKDIR /notesx/app
 
@@ -23,4 +25,5 @@ ENV NODE_ENV=production
 # Type checking is done in the repo before building the image.
 RUN npx tsc --noCheck
 
-CMD ["/notesx/docker-entrypoint.sh"]
+# ENTRYPOINT (not CMD) so the platform can't prepend `node` to our shell script.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
