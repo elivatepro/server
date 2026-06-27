@@ -1,10 +1,141 @@
+/*
+ * Boko OS — premium shared-note styling.
+ * Editorial-luxury enhancement layered over the inherited Obsidian theme.
+ * Variable serif display headings, refined typographic rhythm, hairline rules,
+ * brand-orange accents. Works in both light and dark themes via theme vars.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+
+:root {
+    --boko-accent: #f2784b;
+    --boko-ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 html, body {
     overflow: visible !important;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 div.view-content {
     height: 100% !important;
     padding: 0 !important;
+}
+
+/* Reading column: generous measure, heavy breathing room. */
+.markdown-preview-sizer.markdown-preview-section {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: clamp(3rem, 8vw, 6rem) clamp(1.25rem, 5vw, 2rem) 8rem;
+}
+
+/* Body copy — a touch more air than Obsidian's default for long-form reading. */
+.markdown-preview-section p,
+.markdown-preview-section li {
+    line-height: 1.75;
+    letter-spacing: 0.003em;
+}
+
+/* Display headings — variable serif, tight tracking, real hierarchy. */
+.markdown-preview-section h1,
+.markdown-preview-section h2,
+.markdown-preview-section h3,
+.markdown-preview-section h4 {
+    font-family: 'Fraunces', Georgia, 'Times New Roman', serif !important;
+    font-optical-sizing: auto;
+    letter-spacing: -0.018em;
+    line-height: 1.12;
+}
+.markdown-preview-section h1 {
+    font-weight: 600;
+    font-size: clamp(2.2rem, 5vw, 3.1rem);
+    margin: 0 0 1.4rem;
+}
+.markdown-preview-section h2 {
+    font-weight: 600;
+    font-size: clamp(1.6rem, 3.4vw, 2rem);
+    margin: 3rem 0 1rem;
+    padding-top: 1.4rem;
+    border-top: 1px solid color-mix(in srgb, currentColor 9%, transparent);
+}
+.markdown-preview-section h3 {
+    font-weight: 600;
+    font-size: clamp(1.25rem, 2.4vw, 1.45rem);
+    margin: 2.2rem 0 0.7rem;
+}
+.markdown-preview-section h4 {
+    font-weight: 500;
+    font-size: 1.12rem;
+    margin: 1.8rem 0 0.5rem;
+}
+
+/* Links — brand accent with an animated hairline underline. */
+.markdown-preview-section a:not(.toc-link) {
+    color: var(--boko-accent);
+    text-decoration: none;
+    background-image: linear-gradient(var(--boko-accent), var(--boko-accent));
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 320ms var(--boko-ease);
+}
+.markdown-preview-section a:not(.toc-link):hover {
+    background-size: 100% 1px;
+}
+
+/* Blockquotes — editorial, accent rule, no heavy box. */
+.markdown-preview-section blockquote {
+    border-left: 2px solid var(--boko-accent);
+    margin: 1.8rem 0;
+    padding: 0.2rem 0 0.2rem 1.6rem;
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 1.18rem;
+    font-style: italic;
+    line-height: 1.6;
+    opacity: 0.92;
+}
+
+/* Horizontal rule — a centered hairline, not a slab. */
+.markdown-preview-section hr {
+    border: none;
+    height: 1px;
+    margin: 3.5rem auto;
+    width: 60%;
+    background: linear-gradient(90deg,
+        transparent,
+        color-mix(in srgb, currentColor 22%, transparent),
+        transparent);
+}
+
+/* Inline code & code blocks — softer, squircle, hairline. */
+.markdown-preview-section :not(pre) > code {
+    font-size: 0.86em;
+    padding: 0.15em 0.42em;
+    border-radius: 6px;
+    background: color-mix(in srgb, currentColor 7%, transparent);
+}
+.markdown-preview-section pre {
+    border-radius: 14px;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* Images — squircle with a soft, diffused ambient shadow (no harsh box). */
+.markdown-preview-section img {
+    border-radius: 14px;
+    box-shadow: 0 1px 1px color-mix(in srgb, currentColor 6%, transparent),
+                0 18px 40px -24px color-mix(in srgb, currentColor 30%, transparent);
+}
+
+/* Gentle fade-up as the note settles in. */
+@media (prefers-reduced-motion: no-preference) {
+    .markdown-preview-sizer > * {
+        animation: boko-fade-up 700ms var(--boko-ease) both;
+    }
+    @keyframes boko-fade-up {
+        from { opacity: 0; transform: translateY(10px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
 }
 
 .callout.is-collapsible .callout-title {
@@ -21,21 +152,31 @@ div.view-content {
  */
 .toc-sidebar {
     position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: 240px;
+    top: 50%;
+    right: max(1.5rem, calc((100vw - 46rem) / 2 - 268px));
+    transform: translateY(-50%);
+    max-height: 76vh;
+    width: 232px;
     box-sizing: border-box;
-    padding: 28px 20px 28px 12px;
+    padding: 6px 14px 6px 0;
     overflow-y: auto;
     z-index: 50;
-    font-size: 13px;
     line-height: 1.4;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
     scrollbar-width: none;
 }
 .toc-sidebar::-webkit-scrollbar { width: 0; height: 0; }
+
+.toc-eyebrow {
+    display: block;
+    margin: 0 0 12px 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    color: var(--text-faint, #9aa0a6);
+}
 
 .toc-list {
     list-style: none;
@@ -49,38 +190,107 @@ div.view-content {
 }
 
 .toc-link {
+    position: relative;
     display: block;
-    padding: 4px 10px;
+    padding: 5px 10px 5px 22px;
+    font-size: 12.5px;
     color: var(--text-faint, #9aa0a6);
     text-decoration: none;
-    border-left: 2px solid transparent;
-    border-radius: 0 4px 4px 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+    transition: color 360ms var(--boko-ease),
+                padding-left 360ms var(--boko-ease),
+                opacity 360ms var(--boko-ease);
+    opacity: 0.75;
+}
+
+/* The active indicator is a short accent tick that grows in, not a full border. */
+.toc-link::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 12px;
+    height: 1.5px;
+    background: var(--boko-accent);
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: left center;
+    transition: transform 360ms var(--boko-ease);
 }
 
 .toc-link:hover {
     color: var(--text-normal, #2e3338);
-    background-color: var(--background-modifier-hover, rgba(0, 0, 0, 0.04));
+    opacity: 1;
 }
 
 .toc-link.is-active {
     color: var(--text-normal, #2e3338);
-    border-left-color: var(--interactive-accent, #f2784b);
+    opacity: 1;
+    padding-left: 28px;
     font-weight: 600;
+}
+.toc-link.is-active::before {
+    transform: translateY(-50%) scaleX(1);
 }
 
 /* Indentation by heading depth. */
-.toc-level-1 > .toc-link { padding-left: 10px; }
-.toc-level-2 > .toc-link { padding-left: 22px; font-size: 12.5px; }
-.toc-level-3 > .toc-link { padding-left: 34px; font-size: 12.5px; }
-.toc-level-4 > .toc-link { padding-left: 46px; font-size: 12px; }
+.toc-level-2 > .toc-link { padding-left: 34px; }
+.toc-level-2 > .toc-link.is-active { padding-left: 40px; }
+.toc-level-3 > .toc-link { padding-left: 46px; font-size: 12px; }
+.toc-level-3 > .toc-link.is-active { padding-left: 52px; }
+.toc-level-4 > .toc-link { padding-left: 58px; font-size: 12px; }
 .toc-level-5 > .toc-link,
-.toc-level-6 > .toc-link { padding-left: 58px; font-size: 12px; }
+.toc-level-6 > .toc-link { padding-left: 70px; font-size: 11.5px; }
 
 /* Hide on narrow screens so it never crowds the note. */
 @media (max-width: 1200px) {
     .toc-sidebar { display: none; }
+}
+
+/*
+ * Footer status bar — refined Boko OS credit.
+ */
+.status-bar {
+    background: transparent !important;
+    border-top: 1px solid color-mix(in srgb, currentColor 8%, transparent) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 6px 14px !important;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+.status-bar .status-bar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+.status-bar a {
+    color: var(--text-muted, #6b7280);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 280ms var(--boko-ease), opacity 280ms var(--boko-ease);
+    opacity: 0.85;
+}
+.status-bar a:hover {
+    color: var(--boko-accent);
+    opacity: 1;
+}
+.status-bar img {
+    transition: transform 360ms var(--boko-ease);
+}
+.status-bar a:hover img {
+    transform: rotate(-8deg) scale(1.08);
+}
+#theme-mode-toggle {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 280ms var(--boko-ease), transform 280ms var(--boko-ease);
+}
+#theme-mode-toggle:hover {
+    opacity: 1;
+    transform: scale(1.15);
 }

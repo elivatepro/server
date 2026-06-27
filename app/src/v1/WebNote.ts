@@ -20,6 +20,7 @@ export default class WebNote {
     noteContent: 'TEMPLATE_NOTE_CONTENT',
     scripts: 'TEMPLATE_SCRIPTS',
     assetsWebroot: 'TEMPLATE_ASSETS_WEBROOT',
+    ogImage: 'TEMPLATE_OG_IMAGE',
     decryptionFunctions: 'TEMPLATE_DECRYPTION_FUNCTIONS'
   }
 
@@ -36,6 +37,9 @@ export default class WebNote {
     this.app = app
     this.html = htmlTemplate
     this.replace(this.placeholders.assetsWebroot, this.app.baseWebUrl + '/assets')
+    // Branded link-preview (Open Graph / Twitter) image. The brand logo on the
+    // public web root; absolute URL so social scrapers can resolve it.
+    this.replace(this.placeholders.ogImage, this.app.baseWebUrl + '/og-card.png')
   }
 
   /**

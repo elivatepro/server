@@ -176,6 +176,11 @@ function buildTableOfContents() {
   nav.className = 'toc-sidebar';
   nav.setAttribute('aria-label', 'Table of contents');
 
+  const eyebrow = document.createElement('span');
+  eyebrow.className = 'toc-eyebrow';
+  eyebrow.textContent = 'On this page';
+  nav.appendChild(eyebrow);
+
   const list = document.createElement('ul');
   list.className = 'toc-list';
 
