@@ -7,6 +7,8 @@ RUN apk add --no-cache font-dejavu
 COPY app /notesx/app
 COPY db /notesx/db
 COPY userfiles /notesx/userfiles
+COPY docker-entrypoint.sh /notesx/docker-entrypoint.sh
+RUN chmod +x /notesx/docker-entrypoint.sh
 
 WORKDIR /notesx/app
 
@@ -21,4 +23,4 @@ ENV NODE_ENV=production
 # Type checking is done in the repo before building the image.
 RUN npx tsc --noCheck
 
-CMD ["node", "dist/index.js" ]
+CMD ["/notesx/docker-entrypoint.sh"]
