@@ -2,6 +2,15 @@
 <html TEMPLATE_HTML>
 <head>
     <meta charset='utf-8'>
+    <!-- Notes are end-to-end encrypted and decrypted with window.crypto.subtle,
+         which only exists in a secure context (HTTPS). If this page was opened
+         over http://, upgrade to https FIRST, preserving the #key fragment, so
+         decryption can run. Without this the note renders blank on http. -->
+    <script>
+      if (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        location.replace('https:' + location.href.substring(location.protocol.length));
+      }
+    </script>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <title>TEMPLATE_TITLE</title>
     TEMPLATE_OG_TITLE

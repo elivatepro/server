@@ -30,6 +30,14 @@ export const appInstance: App = {
 
 const app = new Hono()
 
+// Tell browsers to always use HTTPS for this host. Notes decrypt with
+// window.crypto.subtle, which requires a secure context; HSTS prevents an
+// http:// landing that would break decryption and render the note blank.
+app.use('*', async (c, next) => {
+  await next()
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+})
+
 // Routes
 app.use('/v1/*', cors()) // CORS for all API routes
 app.route('/v1/file', fileRouter)
