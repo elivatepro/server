@@ -14,3 +14,73 @@ div.view-content {
 .force-cursor {
     cursor: pointer !important;
 }
+
+/*
+ * Table of contents — Notion-style floating sidebar with scroll-spy.
+ * Built by buildTableOfContents() in app.js.
+ */
+.toc-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 240px;
+    box-sizing: border-box;
+    padding: 28px 20px 28px 12px;
+    overflow-y: auto;
+    z-index: 50;
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+    scrollbar-width: none;
+}
+.toc-sidebar::-webkit-scrollbar { width: 0; height: 0; }
+
+.toc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.toc-item {
+    margin: 0;
+    padding: 0;
+}
+
+.toc-link {
+    display: block;
+    padding: 4px 10px;
+    color: var(--text-faint, #9aa0a6);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    border-radius: 0 4px 4px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.toc-link:hover {
+    color: var(--text-normal, #2e3338);
+    background-color: var(--background-modifier-hover, rgba(0, 0, 0, 0.04));
+}
+
+.toc-link.is-active {
+    color: var(--text-normal, #2e3338);
+    border-left-color: var(--interactive-accent, #f2784b);
+    font-weight: 600;
+}
+
+/* Indentation by heading depth. */
+.toc-level-1 > .toc-link { padding-left: 10px; }
+.toc-level-2 > .toc-link { padding-left: 22px; font-size: 12.5px; }
+.toc-level-3 > .toc-link { padding-left: 34px; font-size: 12.5px; }
+.toc-level-4 > .toc-link { padding-left: 46px; font-size: 12px; }
+.toc-level-5 > .toc-link,
+.toc-level-6 > .toc-link { padding-left: 58px; font-size: 12px; }
+
+/* Hide on narrow screens so it never crowds the note. */
+@media (max-width: 1200px) {
+    .toc-sidebar { display: none; }
+}

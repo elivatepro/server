@@ -133,6 +133,11 @@ function initDocument() {
   window.addEventListener('resize', toggleMobileClasses);
 
   /*
+   * Table of contents (Notion-style floating sidebar with scroll-spy)
+   */
+  buildTableOfContents();
+
+  /*
    * Lucide icons
    */
   addScript(window.location.origin + '/assets/lucide.0.287.0.js', () => {
@@ -143,6 +148,96 @@ function initDocument() {
       nameAttr: 'data-share-note-lucide'
     });
   });
+}
+
+/*
+ * Build a Notion-style floating table of contents.
+ *
+ * Reads the rendered headings from the note, builds a fixed sidebar that lists
+ * them (indented by level), highlights the heading currently in view as you
+ * scroll (scroll-spy via IntersectionObserver), and smooth-scrolls on click.
+ * Hidden on narrow screens via CSS. Safe to call once content is present
+ * (including after decryption of encrypted notes).
+ */
+function buildTableOfContents() {
+  // Avoid building twice (e.g. if called again after decryption).
+  if (document.querySelector('.toc-sidebar')) return;
+
+  const content = document.querySelector('.markdown-preview-sizer') || document.body;
+  const headings = Array.from(content.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+    .filter(h => h.textContent.trim().length);
+
+  // Don't show a TOC for short notes with too few headings.
+  if (headings.length < 2) return;
+
+  const minLevel = Math.min(...headings.map(h => Number(h.tagName[1])));
+
+  const nav = document.createElement('nav');
+  nav.className = 'toc-sidebar';
+  nav.setAttribute('aria-label', 'Table of contents');
+
+  const list = document.createElement('ul');
+  list.className = 'toc-list';
+
+  const linkFor = new Map();
+
+  headings.forEach((heading, i) => {
+    // Ensure each heading has an id to anchor to.
+    if (!heading.id) {
+      heading.id = 'toc-' + i + '-' + heading.textContent.trim().toLowerCase()
+        .replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+    }
+    const level = Number(heading.tagName[1]);
+    const li = document.createElement('li');
+    li.className = 'toc-item toc-level-' + (level - minLevel + 1);
+
+    const a = document.createElement('a');
+    a.className = 'toc-link';
+    a.href = '#' + heading.id;
+    a.textContent = heading.textContent.trim();
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.replaceState(null, '', '#' + heading.id);
+    });
+
+    li.appendChild(a);
+    list.appendChild(li);
+    linkFor.set(heading, a);
+  });
+
+  nav.appendChild(list);
+  document.body.appendChild(nav);
+
+  // Scroll-spy: highlight the heading nearest the top of the viewport.
+  const visible = new Set();
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) visible.add(entry.target);
+      else visible.delete(entry.target);
+    });
+
+    let active = null;
+    if (visible.size) {
+      // Topmost currently-visible heading.
+      active = Array.from(visible).sort((a, b) =>
+        a.getBoundingClientRect().top - b.getBoundingClientRect().top)[0];
+    } else {
+      // Nothing intersecting: pick the last heading above the viewport top.
+      for (const h of headings) {
+        if (h.getBoundingClientRect().top < 100) active = h;
+      }
+    }
+
+    linkFor.forEach((link, heading) => {
+      link.classList.toggle('is-active', heading === active);
+    });
+    if (active) {
+      linkFor.get(active).scrollIntoView({ block: 'nearest' });
+    }
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+
+  headings.forEach(h => observer.observe(h));
 }
 
 function addScript(url, onload) {
