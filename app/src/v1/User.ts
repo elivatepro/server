@@ -30,10 +30,20 @@ export default class User extends Controller {
     }
     this.user = user
 
-    // Revoke any existing keys
-    this.app.db
-      .prepare('UPDATE api_keys SET revoked=? WHERE users_id = ? AND revoked IS NULL')
-      .run(now(), user.row.id)
+    // If this user already has a valid (non-revoked) key, return it instead of
+    // rotating. Rotating on every call meant any extra request to get-key (a
+    // retry, a verification hit, a second device) silently invalidated the key
+    // the plugin was already using, causing "Invalid API key" (462) errors.
+    const existing = this.app.db
+      .prepare('SELECT api_key FROM api_keys WHERE users_id = ? AND revoked IS NULL ORDER BY created DESC LIMIT 1')
+      .get(user.row.id) as { api_key: string } | undefined
+    if (existing?.api_key) {
+      return {
+        user,
+        apiKey: existing,
+        key: existing.api_key
+      }
+    }
 
     // Create the new API key
     const apiKey = await Mapper(this.app.db, 'api_keys')
