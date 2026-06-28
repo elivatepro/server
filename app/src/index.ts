@@ -122,6 +122,17 @@ if (process.env.LEGACY_PATHS) {
   )
 }
 
+// Force revalidation on bundled assets (app.js, global-note-styles.css, etc.).
+// These are served from fixed URLs but change between deploys; without a
+// validator the browser heuristically caches them and can run a stale,
+// previously-broken app.js (the "blank note" symptom). `no-cache` lets the
+// browser keep a copy but requires it to revalidate with the origin before
+// using it, so a redeploy is picked up immediately.
+app.use('/assets/*', async (c, next) => {
+  await next()
+  c.header('Cache-Control', 'no-cache')
+})
+
 // Serve static files
 app.use('*', serveStatic({ root: './static' }))
 
