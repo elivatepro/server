@@ -52,13 +52,53 @@ body {
     color: var(--text-normal, var(--boko-ink));
 }
 
-html, body {
+/*
+ * SCROLL — make the document the single native scroller.
+ *
+ * The captured Obsidian theme sets `html, body { height: 100% }` and lets
+ * `body` carry overflow, so the whole note was trapped in a nested body-scroll
+ * inside a 100vh viewport. Scrolling an inner element (not the document) loses
+ * the OS's native momentum/rubber-band path on macOS — that's the laggy,
+ * misbehaving scroll. Force html to be the scroller and let body flow to its
+ * content height so the overflow lives on the document.
+ */
+html,
+html.theme-dark,
+html.theme-light {
+    height: auto !important;
+    min-height: 100% !important;
+    max-height: none !important;
     overflow-x: hidden !important;
-    overflow-y: visible !important;
+    overflow-y: auto !important;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     width: 100%;
     max-width: 100%;
+    scroll-behavior: smooth;
+}
+body,
+body.theme-dark,
+body.theme-light {
+    height: auto !important;
+    min-height: 100vh !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    width: 100%;
+    max-width: 100%;
+    /* Belt-and-suspenders: if a theme still keeps body as the scroller, at
+     * least make that scroll smooth and contained rather than janky. */
+    overscroll-behavior-y: contain;
+}
+/* Neutralise the theme's `body > .workspace-split { height: 100% }`, which
+ * otherwise clamps the content column to the viewport and forces the inner
+ * scroll. Matches the theme selector's specificity so it actually wins. */
+body > .workspace-split,
+body > .workspace-split.mod-vertical.mod-root {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
 }
 
 /*
@@ -314,6 +354,12 @@ div.view-content {
     -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
             mask-image: linear-gradient(to bottom, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
     scrollbar-width: none;
+    /* Promote the fixed, masked sidebar to its own compositor layer so it does
+     * not trigger a full-page repaint on every scroll frame (a scroll-jank
+     * source on long notes). */
+    will-change: transform;
+    contain: layout paint style;
+    backface-visibility: hidden;
 }
 .toc-sidebar::-webkit-scrollbar { width: 0; height: 0; }
 
