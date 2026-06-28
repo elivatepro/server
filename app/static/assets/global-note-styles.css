@@ -73,14 +73,23 @@ html, body {
 .workspace-split,
 .workspace-leaf,
 .workspace-leaf-content,
-.markdown-reading-view {
+.markdown-reading-view,
+.markdown-preview-view {
     display: block !important;
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
-    min-height: 0 !important;
+    /* min-height: 0 lets these flex children collapse to 0; combined with the
+     * scroll container's overflow that clipped the whole note to a blank page.
+     * Let them grow to their content instead. */
+    min-height: auto !important;
     flex: none !important;
+    /* The inherited .markdown-preview-view carries overflow:auto, which on a
+     * zero-height ancestor clipped all content. Force visible so the document
+     * simply flows down the page. */
     overflow: visible !important;
+    position: static !important;
+    contain: none !important;
 }
 
 div.view-content {
