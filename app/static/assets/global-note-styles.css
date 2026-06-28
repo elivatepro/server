@@ -4,7 +4,7 @@
  * Variable serif display headings, refined typographic rhythm, hairline rules,
  * brand-orange accents. Works in both light and dark themes via theme vars.
  */
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
     --boko-accent: #f2784b;
@@ -105,6 +105,26 @@ div.view-content {
     box-sizing: border-box;
     margin: 0 auto;
     padding: clamp(2.25rem, 7vw, 6rem) clamp(1.25rem, 6vw, 2.5rem) 7rem;
+}
+
+/* Reading font — override whatever monospace/odd font the captured Obsidian
+ * theme baked into --font-text (e.g. Source Code Pro), which otherwise makes
+ * the whole note read like terminal output. Real code stays monospace below. */
+.markdown-preview-section,
+.markdown-preview-section p,
+.markdown-preview-section li,
+.markdown-preview-section td,
+.markdown-preview-section th,
+.markdown-preview-section blockquote p,
+.inline-title {
+    font-family: 'Newsreader', Georgia, 'Times New Roman', serif !important;
+}
+/* Keep monospace where it belongs: inline code and code blocks. */
+.markdown-preview-section code,
+.markdown-preview-section pre,
+.markdown-preview-section kbd,
+.markdown-preview-section samp {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
 }
 
 /* Body copy — a touch more air than Obsidian's default for long-form reading. */
