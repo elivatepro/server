@@ -82,13 +82,29 @@ body.theme-light {
     height: auto !important;
     min-height: 100vh !important;
     max-height: none !important;
-    overflow-x: hidden !important;
-    overflow-y: visible !important;
+    /* Must be `visible` on BOTH axes. The captured theme sets `overflow: clip`
+     * on body; mixing `overflow-x: hidden/clip` with `overflow-y: visible`
+     * makes the browser compute the visible axis to `auto`, turning body back
+     * into a scroll container (the nested-scroll jank). Full `visible` keeps
+     * body from establishing any scroll container, so overflow falls through
+     * to the document/html — the single native scroller. */
+    overflow: visible !important;
+    /* The decisive one: the captured theme sets `contain: strict` on body,
+     * which includes SIZE containment — body sizes to its containing block and
+     * ignores its content height entirely, so it stays viewport-tall no matter
+     * what `height` we set, trapping the scroll. Removing containment lets body
+     * grow to its content and the document scroll naturally. */
+    contain: none !important;
     width: 100%;
     max-width: 100%;
-    /* Belt-and-suspenders: if a theme still keeps body as the scroller, at
-     * least make that scroll smooth and contained rather than janky. */
-    overscroll-behavior-y: contain;
+}
+/* Horizontal containment moves up to html, where it won't conflict with the
+ * document scroll (html scrolls vertically, clips horizontally). */
+html,
+html.theme-dark,
+html.theme-light {
+    overflow-x: clip !important;
+    contain: none !important;
 }
 /* Neutralise the theme's `body > .workspace-split { height: 100% }`, which
  * otherwise clamps the content column to the viewport and forces the inner
